@@ -1,9 +1,8 @@
 """
-Title: Automated Multi-Taxonomy Risk Scoring Engine (Clean View)
+Title: Automated Multi-Taxonomy Risk Scoring Engine
 Author: Myunghee Jung
 Date: 2026-10-26
-Description: Refactored page code with all redundant sidebar controls and emojis removed.
-             Fully integrated with the main st.navigation router framework.
+Description: 
 """
 
 import json
@@ -54,7 +53,7 @@ def load_taxonomies():
     return maps
 
 def calculate_risk_score(row, asset_crit_column, weight_dict):
-    """Executes standard arithmetic linear aggregation across multiple risk dimensions."""
+  
     v_severity = (row["CVSS base score"] / 10.0) if pd.notna(row["CVSS base score"]) else 0.0
     v_exploited = 1.0 if str(row.get("Exploitation context", "")).strip().lower() == "active" else 0.0
     v_poc, v_patch, v_controls, v_transfer = 0.5, 0.5, 0.3, 0.0
@@ -72,7 +71,7 @@ def calculate_risk_score(row, asset_crit_column, weight_dict):
     return round(final_score, 2)
 
 def main():
-    # Main View UI Elements (No emojis, no sidebar controls)
+
     st.title("Automated Multi-Taxonomy Risk Scoring Engine")
     st.caption("Version 1.0 (Development)")
     st.divider()
@@ -101,10 +100,9 @@ def main():
     df["Final_Risk_Score_Option_B"] = df.apply(lambda r: calculate_risk_score(r, "Asset_Crit_B", weights), axis=1)
     df["Final_Risk_Score_Option_C"] = df.apply(lambda r: calculate_risk_score(r, "Asset_Crit_C", weights), axis=1)
     
-    # Default sorting configuration (Option B as standard priority)
+    # Default sorting configuration 
     df_sorted = df.sort_values(by="Final_Risk_Score_Option_B", ascending=False)
     
-    # Display interactive data view matrix on the main container canvas
     st.subheader("Risk Calculation Summary Matrix")
     output_columns = [
         "CVE ID", 
@@ -116,7 +114,7 @@ def main():
     ]
     st.dataframe(df_sorted[output_columns], use_container_width=True)
     
-    # Save output spreadsheet back to disk destination seamlessly
+    # Save output spreadsheet
     try:
         df_sorted.to_excel(OUTPUT_EXCEL_PATH, index=False)
         st.success(f"Excel sheet exported successfully to: {OUTPUT_EXCEL_PATH}")

@@ -83,29 +83,6 @@ if "active_taxonomy" not in st.session_state: st.session_state.active_taxonomy =
 
 # 5. Main Dashboard Header View Layout
 st.title("SOC Main Dashboard")
-
-# System Control Room Section to execute the backend script
-st.subheader("Backend Engine Control Room")
-if st.button("Execute Scoring Engine (scoring.py)", use_container_width=True, type="primary"):
-    if os.path.exists(SCORING_SCRIPT_PATH):
-        with st.spinner("Executing background mathematical calculations via scoring.py..."):
-            try:
-                result = subprocess.run(
-                    [sys.executable, SCORING_SCRIPT_PATH],
-                    capture_output=True, text=True, check=True
-                )
-                st.success("Scoring Engine compiled and completed successfully.")
-                st.cache_data.clear()
-                st.rerun()
-            except subprocess.CalledProcessError as e:
-                st.error(f"Execution Error inside scoring.py script pipeline: {e.stderr}")
-            except Exception as ex:
-                st.error(f"Unexpected operational error during subsystem routing: {ex}")
-    else:
-        st.error(f"Target executable background script not found at absolute path destination: {SCORING_SCRIPT_PATH}")
-
-st.markdown("---")
-
 st.subheader("Select Active Taxonomy Perspective")
 btn_none, btn_a, btn_b, btn_c = st.columns(4)
 
@@ -156,34 +133,80 @@ c1.metric("Total Active Detections", f"{tot:,}")
 c2.metric(priority_label, f"{priority_count:,}")
 c3.metric(f"High Risk Threshold (>= {h_thresh})", len(v_data[v_data[s_col] >= h_thresh]) if tot > 0 else 0)
 
-ch_col, act_col = st.columns(2)
-with ch_col:
+col1, col2, col3 = st.columns(3)
+
+col1, col2, col3 = st.columns(3)
+
+# Column 1: Asset Group
+with col1:
     if tot > 0 and "Asset group" in v_data.columns:
         st.plotly_chart(px.pie(v_data["Asset group"].value_counts().reset_index(name="Count"), values="Count", names="Asset group", hole=0.4, title="Detections by Asset Group"), use_container_width=True)
-with act_col:
-    st.markdown("**Actionable Mitigation Directives (Top 5 Prioritized):**")
-    
-    compiled_df = load_compiled_model_data()
-    
-    if compiled_df is not None and not compiled_df.empty:
-        if st.session_state.active_taxonomy == "Option A":
-            model_sort_col = "Final_Risk_Score_Option_A"
-        elif st.session_state.active_taxonomy == "Option C":
-            model_sort_col = "Final_Risk_Score_Option_C"
-        else:
-            model_sort_col = "Final_Risk_Score_Option_B"
-            
-        if model_sort_col in compiled_df.columns:
-            for _, r in compiled_df.sort_values(by=model_sort_col, ascending=False).head(5).iterrows():
-                st.info(f"{str(r.get('CVE ID', 'No CVE'))} [{r.get('Asset group', 'General')}]: {r.get('Vulnerability title', 'Untitled Finding')} (Engine Score: {r.get(model_sort_col)})")
-        else:
-            if tot > 0:
-                for _, r in v_data.sort_values(by=s_col, ascending=False).head(5).iterrows():
-                    st.info(f"{str(r.get('CVE ID', 'No CVE'))} [{r.get('Asset group', 'General')}]: {r.get('Vulnerability title', 'Untitled Finding')} (Score: {r.get(s_col)})")
+
+# Column 2: Exposure Classification
+with col2:
+    if tot > 0 and "Exposure classification" in v_data.columns:
+        counts = v_data['Exposure classification'].value_counts().reset_index(name="Count")
+        counts.columns = ['Classification', 'Count']
+        
+        fig = px.pie(counts, values='Count', names='Classification', title='Count by Exposure Classification', hole=0.4)
+        fig.update_traces(textinfo='value', textposition='inside')
+        st.plotly_chart(fig, use_container_width=True)
     else:
-        if tot > 0:
-            for _, r in v_data.sort_values(by=s_col, ascending=False).head(5).iterrows():
-                st.info(f"{str(r.get('CVE ID', 'No CVE'))} [{r.get('Asset group', 'General')}]: {r.get('Vulnerability title', 'Untitled Finding')} (Score: {r.get(s_col)})")
+        st.warning("No exposure classification data.")
+
+# Column 3: Contextual Priority (Raw Clumn Value - Recalculate!!!)
+with col3:
+    if tot > 0 and 'Contextual priority' in v_data.columns:
+        p_counts = v_data['Contextual priority'].value_counts().reset_index(name="Count")
+        p_counts.columns = ['Priority', 'Count']
+        
+        fig = px.pie(p_counts, values='Count', names='Priority', title='Count by Contextual Priority', hole=0.4)
+        fig.update_traces(textinfo='value', textposition='inside')
+        st.plotly_chart(fig, use_container_width=True)
+    else:
+        st.warning("No contextual priority data available.")
+
+# 4. Actionable Mitigation Directives (Top 5 Prioritized per Top 5 Affected Asset Groups)
+st.markdown("### **Actionable Mitigation Directives (Top 5 Prioritized for Top 5 Affected Asset Groups):**")
+
+compiled_df = load_compiled_model_data()
+
+# 1. Determine active sorting column based on active taxonomy view
+if is_dyn:
+    if st.session_state.active_taxonomy == "Option A":
+        model_sort_col = "Final_Risk_Score_Option_A"
+    elif st.session_state.active_taxonomy == "Option C":
+        model_sort_col = "Final_Risk_Score_Option_C"
+    else:
+        model_sort_col = "Final_Risk_Score_Option_B"
+else:
+    model_sort_col = "CVSS base score"
+
+# 2. Select data source (compiled model file takes precedence over memory cache)
+source_df = compiled_df if (compiled_df is not None and not compiled_df.empty and model_sort_col in compiled_df.columns) else v_data
+
+if not source_df.empty and "Asset group" in source_df.columns:
+    # 3. Find the top 5 asset groups based on total detection count (affected assets count)
+    top_5_asset_counts = source_df["Asset group"].value_counts().head(5)
+    top_5_assets = top_5_asset_counts.index.tolist()
+    
+    if top_5_assets:
+        # 4. Dynamically generate tab components with total affected count in the label
+        asset_tabs = st.tabs([f"🌐 {asset} ({top_5_asset_counts[asset]})" for asset in top_5_assets])
+        
+        # 5. Populate each tab with its respective top 5 prioritized findings
+        for tab, asset in zip(asset_tabs, top_5_assets):
+            with tab:
+                asset_top_5 = source_df[source_df["Asset group"] == asset].sort_values(by=model_sort_col, ascending=False).head(5)
+                
+                if not asset_top_5.empty:
+                    for _, r in asset_top_5.iterrows():
+                        score_val = r.get(model_sort_col, r.get(s_col, 0))
+                        st.info(f"**{str(r.get('CVE ID', 'No CVE'))}**: {r.get('Vulnerability title', 'Untitled Finding')} (Risk Score: {score_val})")
+                else:
+                    st.write("No findings detected for this asset group.")
+else:
+    st.warning("No tracking data available to analyze asset categories.")
 
 # 8. Matrix Queues
 def render_q(df):
@@ -198,3 +221,25 @@ t1, t2, t3 = st.tabs(["Active Framework Queue", "CISA KEV Feed Validation", "All
 with t1: render_q(v_data.sort_values(by=s_col, ascending=False) if tot > 0 else v_data)
 with t2: render_q(v_data[v_data["CISA KEV Status"] == "Confirmed - Active Exploitation"] if "CISA KEV Status" in v_data.columns else pd.DataFrame())
 with t3: render_q(v_data)
+
+
+
+# System Control Room Section to execute the backend script
+st.subheader("Backend Engine Control Room")
+if st.button("Execute Scoring Engine (scoring.py)", use_container_width=True, type="primary"):
+    if os.path.exists(SCORING_SCRIPT_PATH):
+        with st.spinner("Executing background mathematical calculations via scoring.py..."):
+            try:
+                result = subprocess.run(
+                    [sys.executable, SCORING_SCRIPT_PATH],
+                    capture_output=True, text=True, check=True
+                )
+                st.success("Scoring Engine compiled and completed successfully.")
+                st.cache_data.clear()
+                st.rerun()
+            except subprocess.CalledProcessError as e:
+                st.error(f"Execution Error inside scoring.py script pipeline: {e.stderr}")
+            except Exception as ex:
+                st.error(f"Unexpected operational error during subsystem routing: {ex}")
+    else:
+        st.error(f"Target executable background script not found at absolute path destination: {SCORING_SCRIPT_PATH}")
