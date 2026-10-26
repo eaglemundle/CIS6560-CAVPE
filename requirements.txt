@@ -7,3 +7,4 @@ Requests==2.34.2
 streamlit==1.64.0
 vega_datasets==0.9.0
 yfinance==1.7.0
+openpyxl
