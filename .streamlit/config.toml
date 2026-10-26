@@ -1,18 +1,13 @@
 [theme]
-# Base theme configuration ('light' or 'dark')
-base = "dark"
 
-# Primary accent color (buttons, active tabs, etc.)
+base = "light"
+
 primaryColor = "#2563EB"
 
-# Background color (clean and bright minimalist tone)
 backgroundColor = "#F8F9FA"
 
-# Sidebar background color
 secondaryBackgroundColor = "#FFFFFF"
 
-# Default text color (dark tone for high readability)
 textColor = "#1E293B"
 
-# Font family specification
 font = "sans serif"

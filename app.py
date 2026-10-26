@@ -37,7 +37,7 @@ if st.session_state.selected_version is None:
         
         with sub_col1:
             # Navigation button to Calendar page
-            if st.button("Open Calendar", key="go_calendar", use_container_width=True):
+            if st.button("Open Calendar", key="go_calendar", width="stretch"):
                 st.session_state.selected_version = calendar_page
                 st.rerun()
                 
@@ -47,22 +47,22 @@ if st.session_state.selected_version is None:
             if os.path.exists(file_path):
                 with open(file_path, "rb") as file:
                     st.download_button(
-                        label="📄 Charter",
+                        label="Project Charter",
                         data=file,
                         file_name=os.path.basename(file_path),
                         mime="application/octet-stream",
-                        use_container_width=True,
+                        width="stretch",
                         key="download_charter",
                         help="Click to download the local Project Charter file."
                     )
             else:
-                st.error("⚠️ File missing")
+                st.error("File missing")
 
     # Column 2: Legacy Version 0.0
     with col2:
         st.subheader("Version 0.0")
         st.caption("for Streamlit testing")
-        if st.button("Run Version 0.0", key="go_v0", use_container_width=True):
+        if st.button("Run Version 0.0", key="go_v0", width="stretch"):
             st.session_state.selected_version = v0_page
             st.rerun()
 
@@ -70,7 +70,7 @@ if st.session_state.selected_version is None:
     with col3:
         st.subheader("Version 1.0")
         st.caption("In Development")
-        if st.button("Run Version 1.0", key="go_v1", type="primary", use_container_width=True):
+        if st.button("Run Version 1.0", key="go_v1", type="primary", width="stretch"):
             st.session_state.selected_version = v1_page
             st.rerun()
 

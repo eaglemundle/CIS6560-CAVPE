@@ -87,19 +87,19 @@ st.subheader("Select Active Taxonomy Perspective")
 btn_none, btn_a, btn_b, btn_c = st.columns(4)
 
 with btn_none:
-    if st.button("None", use_container_width=True, type="secondary" if st.session_state.active_taxonomy != "None" else "primary"):
+    if st.button("None", width="stretch", type="secondary" if st.session_state.active_taxonomy != "None" else "primary"):
         st.session_state.active_taxonomy = "None"
         st.rerun()
 with btn_a:
-    if st.button("Option A", use_container_width=True, type="secondary" if st.session_state.active_taxonomy != "Option A" else "primary"):
+    if st.button("Option A", width="stretch", type="secondary" if st.session_state.active_taxonomy != "Option A" else "primary"):
         st.session_state.active_taxonomy = "Option A"
         st.rerun()
 with btn_b:
-    if st.button("Option B", use_container_width=True, type="secondary" if st.session_state.active_taxonomy != "Option B" else "primary"):
+    if st.button("Option B", width="stretch", type="secondary" if st.session_state.active_taxonomy != "Option B" else "primary"):
         st.session_state.active_taxonomy = "Option B"
         st.rerun()
 with btn_c:
-    if st.button("Option C", use_container_width=True, type="secondary" if st.session_state.active_taxonomy != "Option C" else "primary"):
+    if st.button("Option C", width="stretch", type="secondary" if st.session_state.active_taxonomy != "Option C" else "primary"):
         st.session_state.active_taxonomy = "Option C"
         st.rerun()
 
@@ -140,7 +140,7 @@ col1, col2, col3 = st.columns(3)
 # Column 1: Asset Group
 with col1:
     if tot > 0 and "Asset group" in v_data.columns:
-        st.plotly_chart(px.pie(v_data["Asset group"].value_counts().reset_index(name="Count"), values="Count", names="Asset group", hole=0.4, title="Detections by Asset Group"), use_container_width=True)
+        st.plotly_chart(px.pie(v_data["Asset group"].value_counts().reset_index(name="Count"), values="Count", names="Asset group", hole=0.4, title="Detections by Asset Group"), width="stretch")
 
 # Column 2: Exposure Classification
 with col2:
@@ -150,7 +150,7 @@ with col2:
         
         fig = px.pie(counts, values='Count', names='Classification', title='Count by Exposure Classification', hole=0.4)
         fig.update_traces(textinfo='value', textposition='inside')
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width="stretch")
     else:
         st.warning("No exposure classification data.")
 
@@ -162,7 +162,7 @@ with col3:
         
         fig = px.pie(p_counts, values='Count', names='Priority', title='Count by Contextual Priority', hole=0.4)
         fig.update_traces(textinfo='value', textposition='inside')
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width="stretch")
     else:
         st.warning("No contextual priority data available.")
 
@@ -214,7 +214,7 @@ def render_q(df):
     df_d = df.copy()
     df_d.insert(0, "No.", np.arange(1, len(df_d) + 1))
     cols = [c for c in ["No.", "Vulnerability title", "CVE ID", "CISA KEV Status", "Normalized Score", "CVSS base score"] if c in df_d.columns]
-    st.dataframe(df_d[cols + [c for c in df_d.columns if c not in cols and c not in ["Finding ID", "Data status"]]], use_container_width=True, height=400, hide_index=True)
+    st.dataframe(df_d[cols + [c for c in df_d.columns if c not in cols and c not in ["Finding ID", "Data status"]]], width="stretch", height=400, hide_index=True)
 
 st.subheader("Strategic Model Comparison Matrix")
 t1, t2, t3 = st.tabs(["Active Framework Queue", "CISA KEV Feed Validation", "All Discovered Vulnerabilities"])
@@ -226,7 +226,7 @@ with t3: render_q(v_data)
 
 # System Control Room Section to execute the backend script
 st.subheader("Backend Engine Control Room")
-if st.button("Execute Scoring Engine (scoring.py)", use_container_width=True, type="primary"):
+if st.button("Execute Scoring Engine (scoring.py)", width="stretch", type="primary"):
     if os.path.exists(SCORING_SCRIPT_PATH):
         with st.spinner("Executing background mathematical calculations via scoring.py..."):
             try:
