@@ -1,7 +1,12 @@
 import json, os, datetime
 import streamlit as st
 
-st.set_page_config(page_title="Risk Weight Tuning", layout="wide")
+# Page Configuration - native multipage feature
+st.set_page_config(
+    page_title="Risk Weight Tuning Matrix",
+    layout="wide",
+    initial_sidebar_state="expanded"  # Forces the sidebar to stay open
+)
 
 S_DIR = os.path.dirname(os.path.abspath(__file__))
 P_DIR = os.path.dirname(S_DIR)

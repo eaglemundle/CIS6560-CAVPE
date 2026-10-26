@@ -8,7 +8,11 @@ import plotly.express as px
 import streamlit as st
 
 # 1. Page Configuration
-st.set_page_config(page_title="SOC Main", layout="wide")
+st.set_page_config(
+    page_title="SOC Main Dashboard",
+    layout="wide",
+    initial_sidebar_state="expanded"  # Forces the sidebar to stay open
+)
 
 # Force light theme mode regardless of system or browser dark mode settings
 st.markdown(

@@ -16,7 +16,7 @@ if st.session_state.selected_version is None:
     st.set_page_config(
         page_title="Context-Aware Vulnerability Prioritization Engine Version Selector",
         layout="centered",
-        initial_sidebar_state="collapsed",
+    initial_sidebar_state="expanded"  # Forces the sidebar to stay open
     )
 
     st.title("Context-Aware Vulnerability Prioritization Engine")
