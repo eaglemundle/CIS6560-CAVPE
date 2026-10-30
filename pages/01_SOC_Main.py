@@ -107,7 +107,6 @@ with btn_c:
         st.session_state.active_taxonomy = "Option C"
         st.rerun()
 
-st.markdown(f"**Current Active View:** Framework processing routed to **{st.session_state.active_taxonomy}**")
 st.markdown("---")
 
 # 6. Engine Processing
@@ -132,10 +131,19 @@ else:
     priority_count = len(v_data[v_data["CVSS base score"] >= 9.0]) if tot > 0 else 0
     priority_label = "Contextual Priority (CVSS >= 9.0)"
 
-c1, c2, c3 = st.columns(3)
-c1.metric("Total Active Detections", f"{tot:,}")
+c2, c3, c4, c1 = st.columns(4)
 c2.metric(priority_label, f"{priority_count:,}")
 c3.metric(f"High Risk Threshold (>= {h_thresh})", len(v_data[v_data[s_col] >= h_thresh]) if tot > 0 else 0)
+
+count_2026 = v_data['CVE ID'].astype(str).str.startswith('CVE-2026').sum()
+count_2026_unique = v_data[v_data['CVE ID'].astype(str).str.startswith('CVE-2026')]['CVE ID'].nunique()
+if 'df' not in locals() and 'df' not in globals():
+    # Example fallback so the app doesn't crash if df is genuinely missing
+    df = pd.DataFrame({'CVE ID': ['CVE-2026-0001', 'CVE-2025-1234', 'CVE-2026-0002']})
+    
+c4.metric(label="Unique 2026 CVEs", value=f"{count_2026_unique:,}")
+
+c1.metric("Total Active Detections", f"{tot:,}")
 
 col1, col2, col3 = st.columns(3)
 
