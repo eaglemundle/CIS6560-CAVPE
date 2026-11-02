@@ -10,6 +10,13 @@ import os
 import sys
 import pandas as pd
 import streamlit as st  
+from engines.kev_validation import (
+    DEFAULT_KEV_PATH,
+    catalog_warning,
+    cve_level_kev_summary,
+    load_kev,
+    validate_exploitation,
+)
 
 # Absolute path resolution logic
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -55,7 +62,10 @@ def load_taxonomies():
 def calculate_risk_score(row, asset_crit_column, weight_dict):
   
     v_severity = (row["CVSS base score"] / 10.0) if pd.notna(row["CVSS base score"]) else 0.0
-    v_exploited = 1.0 if str(row.get("Exploitation context", "")).strip().lower() == "active" else 0.0
+    if "Exploited_score" in row:
+        v_exploited = row["Exploited_score"] / 2.0
+    else:
+        v_exploited = 1.0 if str(row.get("Exploitation context", "")).strip().lower() == "active" else 0.0
     v_poc, v_patch, v_controls, v_transfer = 0.5, 0.5, 0.3, 0.0
     v_criticality = (row[asset_crit_column] / 4.0)
     
@@ -89,6 +99,17 @@ def main():
         
     df = pd.read_excel(INPUT_EXCEL_PATH)
     df["Exposure classification"] = df["Exposure classification"].fillna("internal").astype(str).str.strip().str.lower()
+
+    kev_catalog = load_kev(DEFAULT_KEV_PATH)
+    kev_notice = catalog_warning(kev_catalog)
+    if kev_notice:
+        st.warning(kev_notice)
+    if kev_catalog:
+        st.caption(
+            f"CISA KEV snapshot {kev_catalog.version}, released "
+            f"{kev_catalog.date_released.date()}."
+        )
+    df = validate_exploitation(df, kev_catalog)
     
     # Structural framework mappings
     df["Asset_Crit_A"] = df["Exposure classification"].map(maps["A"]).fillna(1).astype(int)
@@ -114,9 +135,18 @@ def main():
     ]
     st.dataframe(df_sorted[output_columns], use_container_width=True)
     
-    # Save output spreadsheet
+    # Save scores, KEV discrepancies, and a CVE-deduplicated KEV summary.
     try:
-        df_sorted.to_excel(OUTPUT_EXCEL_PATH, index=False)
+        kev_review = df_sorted[
+            df_sorted["KEV_status"].isin(
+                ["flagged in dataset, not in KEV", "in KEV, not flagged in dataset"]
+            )
+        ]
+        data_quality = cve_level_kev_summary(df_sorted, kev_catalog)
+        with pd.ExcelWriter(OUTPUT_EXCEL_PATH, engine="openpyxl") as writer:
+            df_sorted.to_excel(writer, sheet_name="Scores", index=False)
+            kev_review.to_excel(writer, sheet_name="KEV_Review", index=False)
+            data_quality.to_excel(writer, sheet_name="Data_Quality", index=False)
         st.success(f"Excel sheet exported successfully to: {OUTPUT_EXCEL_PATH}")
     except Exception as e:
         st.error(f"EXPORT ERROR: Failed to save final Excel sheet to disk: {e}")
