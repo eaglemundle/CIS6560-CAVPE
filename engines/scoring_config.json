@@ -103,5 +103,61 @@
       "Low-criticality assets": 1
     },
     "combine": "max"
+  },
+  "_note_score_scale": "Linear conversion from native 0-100 to charter 1-24, rounded to the nearest integer for bands. Unrounded native scores determine ranks.",
+  "score_scale": {
+    "native_min": 0,
+    "native_max": 100,
+    "rescaled_min": 1,
+    "rescaled_max": 24,
+    "rounding": "nearest_integer"
+  },
+  "_note_risk_bands": "Select rescaled_24 (the charter default) or native_100. At shared boundaries, the earlier band in the list wins.",
+  "risk_bands": {
+    "mode": "rescaled_24",
+    "rescaled_24": [
+      {
+        "name": "Low",
+        "min": 1,
+        "max": 6
+      },
+      {
+        "name": "Medium",
+        "min": 7,
+        "max": 12
+      },
+      {
+        "name": "High",
+        "min": 13,
+        "max": 18
+      },
+      {
+        "name": "Critical",
+        "min": 19,
+        "max": 24
+      }
+    ],
+    "native_100": [
+      {
+        "name": "Low",
+        "min": 0,
+        "max": 25
+      },
+      {
+        "name": "Medium",
+        "min": 25,
+        "max": 50
+      },
+      {
+        "name": "High",
+        "min": 50,
+        "max": 75
+      },
+      {
+        "name": "Critical",
+        "min": 75,
+        "max": 100
+      }
+    ]
   }
 }

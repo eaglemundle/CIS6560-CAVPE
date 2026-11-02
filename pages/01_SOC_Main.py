@@ -15,7 +15,8 @@ from engines.asset_criticality import (
     compare_asset_criticality_modes,
     write_asset_criticality_comparison,
 )
-from engines.scoring import calculate_risk_score
+from engines.scoring import calculate_risk_score, rank_findings
+from engines.risk_bands import add_risk_band_columns, build_band_distribution
 
 # 1. Page Configuration
 st.set_page_config(
@@ -179,24 +180,52 @@ if not v_data.empty:
         "Option A comparison uses synthetic asset-tier counts and control descriptions."
     )
     v_data = v_data.drop(columns=["CVSS severity (source)"])
-is_dyn = not v_data.empty and "Exposure classification" in v_data.columns and st.session_state.active_taxonomy != "None"
-
-if is_dyn:
-    w_mat, tax_map = get_matrix_config(st.session_state.active_taxonomy[-1])
-    with open(S_CONF, "r", encoding="utf-8") as scoring_config_file:
-        scoring_config = json.load(scoring_config_file)
-    a_scores, exposure_quality = map_exposure_classification(
-        v_data, tax_map, scoring_config
+    exposure_quality = {}
+    for opt in "ABC":
+        weights, taxonomy_map = get_matrix_config(opt)
+        asset_scores, quality = map_exposure_classification(
+            v_data, taxonomy_map, scoring_config
+        )
+        exposure_quality[opt] = quality
+        if opt == "A":
+            asset_scores = asset_criticality_scores(
+                v_data, asset_scores, scoring_config
+            )
+        asset_column = f"Asset_Crit_{opt}"
+        v_data[asset_column] = asset_scores
+        raw_score_column = f"Unrounded_Risk_Score_Option_{opt}"
+        v_data[raw_score_column] = v_data.apply(
+            lambda row: calculate_risk_score(
+                row, asset_column, weights, scoring_config
+            ),
+            axis=1,
+        )
+        v_data[f"Final_Risk_Score_Option_{opt}"] = v_data[
+            raw_score_column
+        ].round(2)
+        v_data[f"Rank_Option_{opt}"] = rank_findings(v_data, raw_score_column)
+    v_data = add_risk_band_columns(v_data, scoring_config)
+    band_distribution = build_band_distribution(v_data, scoring_config)
+    band_output_path = os.path.join(P_DIR, "outputs", "band_distribution.csv")
+    os.makedirs(os.path.dirname(band_output_path), exist_ok=True)
+    band_distribution.to_csv(band_output_path, index=False)
+    st.caption(
+        f"Risk bands use {scoring_config['risk_bands']['mode']}; distributions "
+        "for both scales are saved under outputs/."
     )
-    if st.session_state.active_taxonomy == "Option A":
-        a_scores = asset_criticality_scores(v_data, a_scores, scoring_config)
-    asset_crit_column = f"Asset_Crit_{st.session_state.active_taxonomy[-1]}"
-    v_data[asset_crit_column] = a_scores
-    if exposure_quality["blank_count"] or exposure_quality["unmapped_count"]:
+
+is_dyn = not v_data.empty and "Exposure classification" in v_data.columns and st.session_state.active_taxonomy != "None"
+if is_dyn:
+    active_opt = st.session_state.active_taxonomy[-1]
+    v_data["Normalized Score"] = v_data[
+        f"Unrounded_Risk_Score_Option_{active_opt}"
+    ]
+    active_quality = exposure_quality[active_opt]
+    if active_quality["blank_count"] or active_quality["unmapped_count"]:
         st.warning(
             "Exposure data quality: "
-            f"{exposure_quality['blank_count']} blank value(s), "
-            f"{exposure_quality['unmapped_count']} unmapped value(s). "
+            f"{active_quality['blank_count']} blank value(s), "
+            f"{active_quality['unmapped_count']} unmapped value(s). "
             "Configured defaults were applied."
         )
         exposure = v_data["Exposure classification"]
@@ -205,36 +234,33 @@ if is_dyn:
             exposure.astype(str)
             .str.strip()
             .str.lower()
-            .map(tax_map)
+            .map(get_matrix_config(active_opt)[1])
             .isna()
             & ~missing
         )
         st.dataframe(
             v_data.loc[missing | unknown, ["Finding ID", "Exposure classification"]]
         )
-    v_data["Normalized Score"] = v_data.apply(
-        lambda row: calculate_risk_score(
-            row, asset_crit_column, w_mat, scoring_config
-        ),
-        axis=1,
-    )
 
 # 7. UI Metrics & Charts
 tot = len(v_data)
 s_col = "Normalized Score" if is_dyn else "CVSS base score"
-h_thresh = 75.0 if is_dyn else 8.0
 
 # Calculate Contextual Priority metrics dynamically based on configuration threshold rules
 if is_dyn:
-    priority_count = len(v_data[v_data["Normalized Score"] >= 85.0]) if tot > 0 else 0
-    priority_label = "Contextual Priority (Score >= 85)"
+    active_opt = st.session_state.active_taxonomy[-1]
+    risk_level_column = f"Risk_Level_Option_{active_opt}"
+    priority_count = int(v_data[risk_level_column].eq("Critical").sum())
+    high_count = int(v_data[risk_level_column].isin(["High", "Critical"]).sum())
+    priority_label = "Contextual Priority (Critical band)"
 else:
     priority_count = len(v_data[v_data["CVSS base score"] >= 9.0]) if tot > 0 else 0
     priority_label = "Contextual Priority (CVSS >= 9.0)"
+    high_count = len(v_data[v_data["CVSS base score"] >= 7.0])
 
 c2, c3, c4, c1 = st.columns(4)
 c2.metric(priority_label, f"{priority_count:,}")
-c3.metric(f"High Risk Threshold (>= {h_thresh})", len(v_data[v_data[s_col] >= h_thresh]) if tot > 0 else 0)
+c3.metric("High or Critical Risk Band" if is_dyn else "High Risk (CVSS >= 7.0)", high_count)
 
 count_2026 = v_data['CVE ID'].astype(str).str.startswith('CVE-2026').sum()
 count_2026_unique = v_data[v_data['CVE ID'].astype(str).str.startswith('CVE-2026')]['CVE ID'].nunique()

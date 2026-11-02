@@ -97,3 +97,17 @@
   tier-only vs blend tau 0.98524 and overlap 30/30. No exposure mappings or
   charter weights changed.
 - Added SciPy to requirements for the requested Kendall tau calculation.
+
+## Phase 6 - Score scale, risk bands, and ranking
+
+- Added configurable native and rescaled score ranges and both band sets. The
+  default is the charter's 1-24 scale and 1-6/7-12/13-18/19-24 bands; the
+  0-100 alternative remains available. Rescaled display values are rounded to
+  the nearest integer, while native unrounded scores drive ranks.
+- Added `Score_Rescaled_Option_A/B/C`, `Risk_Level_Option_A/B/C`, and unique
+  ranks using score descending, exploited score descending, CVSS descending,
+  then Finding ID ascending. Exported `outputs/band_distribution.csv` for all
+  three options under both scale modes.
+- Current rescaled band counts (Low/Medium/High/Critical): Option A 0/6/193/101,
+  Option B 0/8/202/90, Option C 0/5/186/109. Native-scale counts: A
+  0/7/174/119, B 0/9/180/111, C 0/6/171/123. Each mode totals 300 findings.

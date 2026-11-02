@@ -25,7 +25,8 @@ from engines.asset_criticality import (
     compare_asset_criticality_modes,
     write_asset_criticality_comparison,
 )
-from engines.scoring import calculate_risk_score
+from engines.scoring import calculate_risk_score, rank_findings
+from engines.risk_bands import add_risk_band_columns, build_band_distribution
 
 # Absolute path resolution logic
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -194,21 +195,23 @@ def main():
         )
     
     # Background algorithmic risk calculations
-    df["Final_Risk_Score_Option_A"] = df.apply(
-        lambda r: calculate_risk_score(r, "Asset_Crit_A", weights, scoring_config),
-        axis=1,
-    )
-    df["Final_Risk_Score_Option_B"] = df.apply(
-        lambda r: calculate_risk_score(r, "Asset_Crit_B", weights, scoring_config),
-        axis=1,
-    )
-    df["Final_Risk_Score_Option_C"] = df.apply(
-        lambda r: calculate_risk_score(r, "Asset_Crit_C", weights, scoring_config),
-        axis=1,
-    )
+    for opt in "ABC":
+        df[f"Unrounded_Risk_Score_Option_{opt}"] = df.apply(
+            lambda row: calculate_risk_score(
+                row, f"Asset_Crit_{opt}", weights, scoring_config
+            ),
+            axis=1,
+        )
+        df[f"Final_Risk_Score_Option_{opt}"] = df[
+            f"Unrounded_Risk_Score_Option_{opt}"
+        ].round(2)
+        df[f"Rank_Option_{opt}"] = rank_findings(
+            df, f"Unrounded_Risk_Score_Option_{opt}"
+        )
+    df = add_risk_band_columns(df, scoring_config)
     
     # Default sorting configuration 
-    df_sorted = df.sort_values(by="Final_Risk_Score_Option_B", ascending=False)
+    df_sorted = df.sort_values(by="Rank_Option_B", ascending=True)
     
     st.subheader("Risk Calculation Summary Matrix")
     output_columns = [
@@ -218,9 +221,18 @@ def main():
         "CVSS severity (recomputed)",
         "Severity_label_mismatch",
         "Asset_Tier_Score",
+        "Score_Rescaled_Option_A",
+        "Risk_Level_Option_A",
         "Final_Risk_Score_Option_A", 
+        "Rank_Option_A",
+        "Score_Rescaled_Option_B",
+        "Risk_Level_Option_B",
         "Final_Risk_Score_Option_B", 
-        "Final_Risk_Score_Option_C"
+        "Rank_Option_B",
+        "Score_Rescaled_Option_C",
+        "Risk_Level_Option_C",
+        "Final_Risk_Score_Option_C",
+        "Rank_Option_C",
     ]
     st.dataframe(df_sorted[output_columns], use_container_width=True)
     
@@ -316,6 +328,16 @@ def main():
         )
         data_quality = pd.concat(
             [data_quality, pd.DataFrame(metric_rows)], ignore_index=True
+        )
+        band_distribution = build_band_distribution(df_sorted, scoring_config)
+        band_output_path = os.path.join(
+            os.path.dirname(SCRIPT_DIR), "outputs", "band_distribution.csv"
+        )
+        os.makedirs(os.path.dirname(band_output_path), exist_ok=True)
+        band_distribution.to_csv(band_output_path, index=False)
+        st.caption(
+            f"Risk bands use {scoring_config['risk_bands']['mode']}; both scale "
+            f"distributions saved to {band_output_path}."
         )
         with pd.ExcelWriter(OUTPUT_EXCEL_PATH, engine="openpyxl") as writer:
             df_sorted.to_excel(writer, sheet_name="Scores", index=False)

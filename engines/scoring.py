@@ -66,4 +66,17 @@ def calculate_risk_score(
     else:
         weighted_score += transfer_adjustment
 
-    return round(max(minimum_score, weighted_score), 2)
+    if scoring_config is None:
+        return round(max(minimum_score, weighted_score), 2)
+    return max(minimum_score, weighted_score)
+
+
+def rank_findings(data: pd.DataFrame, score_column: str) -> pd.Series:
+    """Assign deterministic one-based ranks without rounding scores."""
+    order = data.sort_values(
+        by=[score_column, "Exploited_score", "CVSS base score", "Finding ID"],
+        ascending=[False, False, False, True],
+        kind="mergesort",
+    )
+    ranks = pd.Series(range(1, len(order) + 1), index=order.index)
+    return ranks.reindex(data.index)

@@ -6,7 +6,7 @@ from typing import Any
 import pandas as pd
 from scipy.stats import kendalltau
 
-from engines.scoring import calculate_risk_score
+from engines.scoring import calculate_risk_score, rank_findings
 
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
@@ -65,13 +65,8 @@ def asset_criticality_scores(
 
 
 def _rank_scores(scores: pd.Series, data: pd.DataFrame) -> pd.Series:
-    order = data.assign(_score=scores).sort_values(
-        by=["_score", "Exploited_score", "CVSS base score", "Finding ID"],
-        ascending=[False, False, False, True],
-        kind="mergesort",
-    )
-    ranks = pd.Series(range(1, len(order) + 1), index=order.index)
-    return ranks.reindex(data.index)
+    ranked_data = data.assign(_score=scores)
+    return rank_findings(ranked_data, "_score")
 
 
 def compare_asset_criticality_modes(

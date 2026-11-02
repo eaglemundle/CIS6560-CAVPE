@@ -15,7 +15,7 @@ from engines.dimension_scores import (
 )
 from engines.kev_validation import load_kev, validate_exploitation
 from engines.scoring_validation import map_exposure_classification
-from engines.scoring import calculate_risk_score
+from engines.scoring import calculate_risk_score, rank_findings
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -227,15 +227,16 @@ def test_integrated_option_a_scores_match_phase4_snapshot():
     data = validate_exploitation(data, load_kev())
     data, _ = add_dimension_scores(data, config)
     data["Asset_Crit_A"], _ = map_exposure_classification(data, taxonomy, config)
-    data["Final_Risk_Score_Option_A"] = data.apply(
+    data["Unrounded_Risk_Score_Option_A"] = data.apply(
         lambda row: calculate_risk_score(
             row, "Asset_Crit_A", weights, config
         ),
         axis=1,
     )
-    data["rank"] = data["Final_Risk_Score_Option_A"].rank(
-        method="min", ascending=False
-    ).astype(int)
+    data["Final_Risk_Score_Option_A"] = data[
+        "Unrounded_Risk_Score_Option_A"
+    ].round(2)
+    data["rank"] = rank_findings(data, "Unrounded_Risk_Score_Option_A")
     actual = data[["Finding ID", "Final_Risk_Score_Option_A", "rank"]]
     expected = pd.read_csv(ROOT / "tests" / "golden" / "option_a_phase4.csv")
 
