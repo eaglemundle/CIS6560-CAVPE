@@ -56,3 +56,29 @@
   labels, and 28 source severity-label mismatches (0 after recomputation).
   Existing configured fallbacks preserve prior behavior when bad input is
   encountered; no charter weights or mapping values changed.
+
+## Phase 4 - Dimension accuracy
+
+- Added shared scoring and dimension modules under `engines/` (the assumed
+  `scripts/` directory does not exist). Patch complexity now uses the configured
+  1/2/3/3 map and `harder_is_higher` default, with a configurable flipped
+  direction and a reported default for unknown labels.
+- Added configurable controls categories, equal-weight default profile, and
+  the switchable effectiveness profile. `Controls_types` and `Controls_score`
+  are exported. All 120 nonblank control descriptions in the current workbook
+  match at least one configured category; zero are unmatched.
+- Added optional manual PoC and risk-register CSV readers. With neither file
+  present, the configured PoC placeholder remains 0.5 normalized (0 of 207 CVEs
+  have lookup coverage) and risk transfer has no effect (0 covered findings).
+  Risk transfer defaults to the configured reducer, supports additive as an
+  alternative, and honors the configured minimum score.
+- Both the SOC dashboard and scoring viewer now call the shared scorer. No
+  charter weights or taxonomy exposure mappings changed.
+- Repository divergence: the actual v1.0 scorer had constant patch and control
+  placeholders, not the existing dimension helpers described by the handoff.
+  Therefore the requested patch/control implementation necessarily changes
+  scores rather than reproducing the golden file except for KEV changes. With
+  the current KEV snapshot, Option A changes from 37.50-78.00 (76 distinct
+  scores, 11 tied at maximum) before these dimensions to 40.17-90.00 (146
+  distinct scores, 2 tied at maximum). This is an intended dimension update,
+  not a weight or taxonomy change.

@@ -18,6 +18,8 @@ from engines.kev_validation import (
     validate_exploitation,
 )
 from engines.scoring_validation import cvss_severity, map_exposure_classification
+from engines.dimension_scores import add_dimension_scores
+from engines.scoring import calculate_risk_score
 
 # Absolute path resolution logic
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -72,27 +74,6 @@ def load_scoring_config():
             st.error("CRITICAL ERROR: Scoring configuration file contains invalid JSON.")
             return None
 
-def calculate_risk_score(row, asset_crit_column, weight_dict):
-  
-    v_severity = (row["CVSS base score"] / 10.0) if pd.notna(row["CVSS base score"]) else 0.0
-    if "Exploited_score" in row:
-        v_exploited = row["Exploited_score"] / 2.0
-    else:
-        v_exploited = 1.0 if str(row.get("Exploitation context", "")).strip().lower() == "active" else 0.0
-    v_poc, v_patch, v_controls, v_transfer = 0.5, 0.5, 0.3, 0.0
-    v_criticality = (row[asset_crit_column] / 4.0)
-    
-    final_score = (
-        (v_severity * weight_dict.get("severity", 0.0)) +
-        (v_exploited * weight_dict.get("exploited_in_the_wild", 0.0)) +
-        (v_poc * weight_dict.get("poc_exploit_availability", 0.0)) +
-        (v_patch * weight_dict.get("patch_difficulty", 0.0)) +
-        (v_controls * weight_dict.get("compensating_controls", 0.0)) +
-        (v_criticality * weight_dict.get("asset_criticality", 0.0)) +
-        (v_transfer * weight_dict.get("risk_acceptance_transfer", 0.0))
-    ) * 100.0
-    return round(final_score, 2)
-
 def main():
 
     st.title("Automated Multi-Taxonomy Risk Scoring Engine")
@@ -123,6 +104,22 @@ def main():
             f"{kev_catalog.date_released.date()}."
         )
     df = validate_exploitation(df, kev_catalog)
+    df, dimension_quality = add_dimension_scores(df, scoring_config)
+    st.caption(
+        "PoC lookup coverage: "
+        f"{dimension_quality['poc_coverage']}; missing values use the configured "
+        "placeholder."
+    )
+    if dimension_quality["controls_unmatched_count"]:
+        st.warning(
+            f"{dimension_quality['controls_unmatched_count']} findings have "
+            "control text that matched no configured category."
+        )
+    if dimension_quality["unknown_count"]:
+        st.warning(
+            f"{dimension_quality['unknown_count']} patch-complexity value(s) "
+            "used the configured default."
+        )
 
     # Structural framework mappings
     exposure_quality = {}
@@ -168,9 +165,18 @@ def main():
         )
     
     # Background algorithmic risk calculations
-    df["Final_Risk_Score_Option_A"] = df.apply(lambda r: calculate_risk_score(r, "Asset_Crit_A", weights), axis=1)
-    df["Final_Risk_Score_Option_B"] = df.apply(lambda r: calculate_risk_score(r, "Asset_Crit_B", weights), axis=1)
-    df["Final_Risk_Score_Option_C"] = df.apply(lambda r: calculate_risk_score(r, "Asset_Crit_C", weights), axis=1)
+    df["Final_Risk_Score_Option_A"] = df.apply(
+        lambda r: calculate_risk_score(r, "Asset_Crit_A", weights, scoring_config),
+        axis=1,
+    )
+    df["Final_Risk_Score_Option_B"] = df.apply(
+        lambda r: calculate_risk_score(r, "Asset_Crit_B", weights, scoring_config),
+        axis=1,
+    )
+    df["Final_Risk_Score_Option_C"] = df.apply(
+        lambda r: calculate_risk_score(r, "Asset_Crit_C", weights, scoring_config),
+        axis=1,
+    )
     
     # Default sorting configuration 
     df_sorted = df.sort_values(by="Final_Risk_Score_Option_B", ascending=False)
@@ -216,6 +222,44 @@ def main():
                     "Finding IDs": ", ".join(quality["unmapped_finding_ids"]),
                 }
             )
+        metric_rows.extend(
+            [
+                {
+                    "Record_type": "Patch",
+                    "Metric": "Unknown patch-complexity values",
+                    "Count": dimension_quality["unknown_count"],
+                    "Values": ", ".join(dimension_quality["unknown_labels"]),
+                    "Finding IDs": ", ".join(
+                        dimension_quality["unknown_finding_ids"]
+                    ),
+                },
+                {
+                    "Record_type": "Controls",
+                    "Metric": "Filled control rows",
+                    "Count": dimension_quality["controls_filled_count"],
+                },
+                {
+                    "Record_type": "Controls",
+                    "Metric": "Control rows with no category match",
+                    "Count": dimension_quality["controls_unmatched_count"],
+                    "Finding IDs": ", ".join(
+                        dimension_quality["controls_unmatched_finding_ids"]
+                    ),
+                },
+                {
+                    "Record_type": "PoC",
+                    "Metric": "PoC lookup coverage",
+                    "Count": dimension_quality["poc_coverage"],
+                },
+                {
+                    "Record_type": "Risk transfer",
+                    "Metric": "Findings covered by risk register",
+                    "Count": dimension_quality[
+                        "risk_register_covered_findings"
+                    ],
+                },
+            ]
+        )
         metric_rows.append(
             {
                 "Record_type": "Metric",

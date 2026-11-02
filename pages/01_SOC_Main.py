@@ -8,6 +8,8 @@ import plotly.express as px
 import streamlit as st
 from engines.kev_validation import catalog_warning, load_kev, validate_exploitation
 from engines.scoring_validation import cvss_severity, map_exposure_classification
+from engines.dimension_scores import add_dimension_scores
+from engines.scoring import calculate_risk_score
 
 # 1. Page Configuration
 st.set_page_config(
@@ -57,13 +59,6 @@ def get_matrix_config(opt_letter):
             .items()
         }
     return weights, mapping
-
-def calc_risk(row, asset_val, w):
-    v_sev = (row["CVSS base score"] / 10.0) if pd.notna(row.get("CVSS base score")) else 0.0
-    v_exp = row["Exploited_score"] / 2.0 if "Exploited_score" in row else 0.0
-    return round(((v_sev * w.get("severity", 0.4)) + (v_exp * w.get("exploited_in_the_wild", 0.15)) + 
-                  (0.5 * w.get("poc_exploit_availability", 0.1)) + (0.5 * w.get("patch_difficulty", 0.1)) + 
-                  (0.3 * w.get("compensating_controls", 0.1)) + ((asset_val / 4.0) * w.get("asset_criticality", 0.1))) * 100.0, 2)
 
 # 4. Data Ingestion
 @st.cache_data
@@ -126,13 +121,14 @@ elif kev_catalog:
     )
 if not v_data.empty:
     v_data = validate_exploitation(v_data, kev_catalog)
+    with open(S_CONF, "r", encoding="utf-8") as scoring_config_file:
+        scoring_config = json.load(scoring_config_file)
+    v_data, dimension_quality = add_dimension_scores(v_data, scoring_config)
     v_data["CISA KEV Status"] = np.where(
         v_data["Exploited_score"] == 2,
         "Confirmed - Active Exploitation",
         "Standard Monitored",
     )
-    with open(S_CONF, "r", encoding="utf-8") as scoring_config_file:
-        scoring_config = json.load(scoring_config_file)
     severity_thresholds = scoring_config["cvss_severity_thresholds"]
     v_data["CVSS severity (source)"] = v_data["CVSS severity"]
     v_data["CVSS severity"] = v_data["CVSS base score"].map(
@@ -148,6 +144,16 @@ if not v_data.empty:
             f"{severity_mismatches} source CVSS severity label(s) disagree with "
             "the numeric score; recomputed labels are displayed."
         )
+    if dimension_quality["controls_unmatched_count"]:
+        st.warning(
+            f"{dimension_quality['controls_unmatched_count']} findings have "
+            "control text that matched no configured category."
+        )
+    if dimension_quality["unknown_count"]:
+        st.warning(
+            f"{dimension_quality['unknown_count']} patch-complexity value(s) "
+            "used the configured default."
+        )
     v_data = v_data.drop(columns=["CVSS severity (source)"])
 is_dyn = not v_data.empty and "Exposure classification" in v_data.columns and st.session_state.active_taxonomy != "None"
 
@@ -158,6 +164,8 @@ if is_dyn:
     a_scores, exposure_quality = map_exposure_classification(
         v_data, tax_map, scoring_config
     )
+    asset_crit_column = f"Asset_Crit_{st.session_state.active_taxonomy[-1]}"
+    v_data[asset_crit_column] = a_scores
     if exposure_quality["blank_count"] or exposure_quality["unmapped_count"]:
         st.warning(
             "Exposure data quality: "
@@ -178,7 +186,12 @@ if is_dyn:
         st.dataframe(
             v_data.loc[missing | unknown, ["Finding ID", "Exposure classification"]]
         )
-    v_data["Normalized Score"] = v_data.apply(lambda r: calc_risk(r, a_scores.loc[r.name], w_mat), axis=1)
+    v_data["Normalized Score"] = v_data.apply(
+        lambda row: calculate_risk_score(
+            row, asset_crit_column, w_mat, scoring_config
+        ),
+        axis=1,
+    )
 
 # 7. UI Metrics & Charts
 tot = len(v_data)
