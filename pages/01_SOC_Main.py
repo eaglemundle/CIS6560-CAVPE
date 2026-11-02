@@ -9,6 +9,12 @@ import streamlit as st
 from engines.kev_validation import catalog_warning, load_kev, validate_exploitation
 from engines.scoring_validation import cvss_severity, map_exposure_classification
 from engines.dimension_scores import add_dimension_scores
+from engines.asset_criticality import (
+    asset_criticality_scores,
+    asset_tier_scores,
+    compare_asset_criticality_modes,
+    write_asset_criticality_comparison,
+)
 from engines.scoring import calculate_risk_score
 
 # 1. Page Configuration
@@ -124,6 +130,9 @@ if not v_data.empty:
     with open(S_CONF, "r", encoding="utf-8") as scoring_config_file:
         scoring_config = json.load(scoring_config_file)
     v_data, dimension_quality = add_dimension_scores(v_data, scoring_config)
+    v_data["Asset_Tier_Score"] = asset_tier_scores(
+        v_data, scoring_config["asset_criticality"]["tier_scores"]
+    )
     v_data["CISA KEV Status"] = np.where(
         v_data["Exploited_score"] == 2,
         "Confirmed - Active Exploitation",
@@ -154,6 +163,21 @@ if not v_data.empty:
             f"{dimension_quality['unknown_count']} patch-complexity value(s) "
             "used the configured default."
         )
+    option_a_weights, option_a_mapping = get_matrix_config("A")
+    option_a_exposure, _ = map_exposure_classification(
+        v_data, option_a_mapping, scoring_config
+    )
+    asset_mode_comparison = compare_asset_criticality_modes(
+        v_data,
+        option_a_exposure,
+        scoring_config["asset_criticality"],
+        option_a_weights,
+        scoring_config,
+    )
+    write_asset_criticality_comparison(asset_mode_comparison)
+    st.caption(
+        "Option A comparison uses synthetic asset-tier counts and control descriptions."
+    )
     v_data = v_data.drop(columns=["CVSS severity (source)"])
 is_dyn = not v_data.empty and "Exposure classification" in v_data.columns and st.session_state.active_taxonomy != "None"
 
@@ -164,6 +188,8 @@ if is_dyn:
     a_scores, exposure_quality = map_exposure_classification(
         v_data, tax_map, scoring_config
     )
+    if st.session_state.active_taxonomy == "Option A":
+        a_scores = asset_criticality_scores(v_data, a_scores, scoring_config)
     asset_crit_column = f"Asset_Crit_{st.session_state.active_taxonomy[-1]}"
     v_data[asset_crit_column] = a_scores
     if exposure_quality["blank_count"] or exposure_quality["unmapped_count"]:

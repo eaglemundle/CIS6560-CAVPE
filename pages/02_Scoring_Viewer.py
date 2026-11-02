@@ -19,6 +19,12 @@ from engines.kev_validation import (
 )
 from engines.scoring_validation import cvss_severity, map_exposure_classification
 from engines.dimension_scores import add_dimension_scores
+from engines.asset_criticality import (
+    asset_criticality_scores,
+    asset_tier_scores,
+    compare_asset_criticality_modes,
+    write_asset_criticality_comparison,
+)
 from engines.scoring import calculate_risk_score
 
 # Absolute path resolution logic
@@ -105,10 +111,17 @@ def main():
         )
     df = validate_exploitation(df, kev_catalog)
     df, dimension_quality = add_dimension_scores(df, scoring_config)
+    df["Asset_Tier_Score"] = asset_tier_scores(
+        df, scoring_config["asset_criticality"]["tier_scores"]
+    )
     st.caption(
         "PoC lookup coverage: "
         f"{dimension_quality['poc_coverage']}; missing values use the configured "
         "placeholder."
+    )
+    st.caption(
+        "Asset-tier counts and compensating-control descriptions are synthetic "
+        "dataset values."
     )
     if dimension_quality["controls_unmatched_count"]:
         st.warning(
@@ -129,6 +142,22 @@ def main():
         )
         df[f"Asset_Crit_{opt}"] = asset_scores
         exposure_quality[opt] = quality
+    exposure_a_scores = df["Asset_Crit_A"].copy()
+    df["Asset_Crit_A"] = asset_criticality_scores(
+        df, exposure_a_scores, scoring_config
+    )
+    asset_mode_comparison = compare_asset_criticality_modes(
+        df,
+        exposure_a_scores,
+        scoring_config["asset_criticality"],
+        weights,
+        scoring_config,
+    )
+    comparison_path = write_asset_criticality_comparison(asset_mode_comparison)
+    st.caption(
+        "Asset-tier counts are synthetic. Mode comparison saved to "
+        f"{comparison_path}."
+    )
 
     active_opt = st.session_state.get("active_taxonomy", "Option B")[-1]
     active_quality = exposure_quality.get(active_opt, exposure_quality["B"])
@@ -188,6 +217,7 @@ def main():
         "CVSS base score", 
         "CVSS severity (recomputed)",
         "Severity_label_mismatch",
+        "Asset_Tier_Score",
         "Final_Risk_Score_Option_A", 
         "Final_Risk_Score_Option_B", 
         "Final_Risk_Score_Option_C"
@@ -257,6 +287,11 @@ def main():
                     "Count": dimension_quality[
                         "risk_register_covered_findings"
                     ],
+                },
+                {
+                    "Record_type": "Dataset note",
+                    "Metric": "Asset tiers and control descriptions",
+                    "Count": "Synthetic dataset values",
                 },
             ]
         )

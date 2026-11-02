@@ -22,7 +22,7 @@
     },
     "default_score": 2
   },
-  "_note_compensating_controls": "Matched controls reduce residual risk. Each category is counted once and the summed category weights are capped.",
+  "_note_compensating_controls": "Matched synthetic control descriptions reduce residual risk. Each category is counted once and the summed category weights are capped.",
   "compensating_controls": {
     "scale_max": 3,
     "max_counted_weight": 3,
@@ -92,5 +92,16 @@
   "_note_risk_transfer_min_score": "Minimum native 0-100 score after transfer reduction.",
   "risk_transfer_min_score": 0.0,
   "_note_risk_transfer_status_scale": "Accepted and transferred statuses map to 1 and 2, respectively, on a 0-2 scale.",
-  "risk_transfer_status_scale_max": 2
+  "risk_transfer_status_scale_max": 2,
+  "_note_asset_criticality": "Option A defaults to charter-defined exposure-only criticality. Tier and blend modes are sensitivity alternatives.",
+  "asset_criticality": {
+    "mode": "exposure_only",
+    "tier_scores": {
+      "Critical assets": 4,
+      "High-criticality assets": 3,
+      "Medium-criticality assets": 2,
+      "Low-criticality assets": 1
+    },
+    "combine": "max"
+  }
 }

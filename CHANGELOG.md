@@ -82,3 +82,18 @@
   scores, 11 tied at maximum) before these dimensions to 40.17-90.00 (146
   distinct scores, 2 tied at maximum). This is an intended dimension update,
   not a weight or taxonomy change.
+
+## Phase 5 - Option A asset criticality alternatives
+
+- Added the configurable `asset_criticality` block with `exposure_only` as the
+  default, highest-nonzero-tier scoring, and `max`/`mean` blend options.
+  `Asset_Tier_Score` is included in the score export; the default Option A
+  score still uses only the charter exposure mapping.
+- Added the pairwise comparison report at
+  `outputs/asset_criticality_modes.csv`, including Kendall's tau and top-30
+  overlap. It labels the asset-tier and control descriptions as synthetic.
+- On the current 300 findings: exposure-only vs tier-only tau 0.83398 and
+  top-30 overlap 21/30; exposure-only vs blend tau 0.84874 and overlap 21/30;
+  tier-only vs blend tau 0.98524 and overlap 30/30. No exposure mappings or
+  charter weights changed.
+- Added SciPy to requirements for the requested Kendall tau calculation.
