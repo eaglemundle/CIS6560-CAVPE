@@ -1,0 +1,13 @@
+{
+  "_note_exposure_default_label": "Label used for blank exposure values. Each such value is counted and reported.",
+  "exposure_default_label": "internal",
+  "_note_exposure_default_score": "Criticality used for unknown nonblank labels. Each such value is counted and reported.",
+  "exposure_default_score": 1,
+  "_note_cvss_severity_thresholds": "CVSS severity bands recomputed from the numeric base score for display and scoring reports.",
+  "cvss_severity_thresholds": {
+    "critical_min": 9.0,
+    "high_min": 7.0,
+    "medium_min": 4.0,
+    "low_min": 0.0
+  }
+}

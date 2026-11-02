@@ -17,11 +17,13 @@ from engines.kev_validation import (
     load_kev,
     validate_exploitation,
 )
+from engines.scoring_validation import cvss_severity, map_exposure_classification
 
 # Absolute path resolution logic
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 
 WEIGHT_CONFIG_PATH = os.path.join(SCRIPT_DIR, "../engines/weight_config.json")
+SCORING_CONFIG_PATH = os.path.join(SCRIPT_DIR, "../engines/scoring_config.json")
 TAXONOMY_FILES = {
     "A": os.path.join(SCRIPT_DIR, "../engines/taxonomy_option_a.json"),
     "B": os.path.join(SCRIPT_DIR, "../engines/taxonomy_option_b.json"),
@@ -59,6 +61,17 @@ def load_taxonomies():
                 return None
     return maps
 
+def load_scoring_config():
+    if not os.path.exists(SCORING_CONFIG_PATH):
+        st.error(f"CRITICAL ERROR: Scoring configuration file is missing at {SCORING_CONFIG_PATH}")
+        return None
+    with open(SCORING_CONFIG_PATH, "r", encoding="utf-8") as f:
+        try:
+            return json.load(f)
+        except json.JSONDecodeError:
+            st.error("CRITICAL ERROR: Scoring configuration file contains invalid JSON.")
+            return None
+
 def calculate_risk_score(row, asset_crit_column, weight_dict):
   
     v_severity = (row["CVSS base score"] / 10.0) if pd.notna(row["CVSS base score"]) else 0.0
@@ -89,8 +102,9 @@ def main():
     # Core background backend operations
     weights = load_weights()
     maps = load_taxonomies()
+    scoring_config = load_scoring_config()
     
-    if weights is None or maps is None:
+    if weights is None or maps is None or scoring_config is None:
         st.stop()
 
     if not os.path.exists(INPUT_EXCEL_PATH):
@@ -98,7 +112,6 @@ def main():
         st.stop()
         
     df = pd.read_excel(INPUT_EXCEL_PATH)
-    df["Exposure classification"] = df["Exposure classification"].fillna("internal").astype(str).str.strip().str.lower()
 
     kev_catalog = load_kev(DEFAULT_KEV_PATH)
     kev_notice = catalog_warning(kev_catalog)
@@ -110,11 +123,49 @@ def main():
             f"{kev_catalog.date_released.date()}."
         )
     df = validate_exploitation(df, kev_catalog)
-    
+
     # Structural framework mappings
-    df["Asset_Crit_A"] = df["Exposure classification"].map(maps["A"]).fillna(1).astype(int)
-    df["Asset_Crit_B"] = df["Exposure classification"].map(maps["B"]).fillna(1).astype(int)
-    df["Asset_Crit_C"] = df["Exposure classification"].map(maps["C"]).fillna(1).astype(int)
+    exposure_quality = {}
+    for opt in "ABC":
+        asset_scores, quality = map_exposure_classification(
+            df, maps[opt], scoring_config
+        )
+        df[f"Asset_Crit_{opt}"] = asset_scores
+        exposure_quality[opt] = quality
+
+    active_opt = st.session_state.get("active_taxonomy", "Option B")[-1]
+    active_quality = exposure_quality.get(active_opt, exposure_quality["B"])
+    if active_quality["blank_count"] or active_quality["unmapped_count"]:
+        st.warning(
+            "Exposure data quality: "
+            f"{active_quality['blank_count']} blank value(s), "
+            f"{active_quality['unmapped_count']} unmapped value(s) for Option "
+            f"{active_opt}. Configured defaults were applied and recorded."
+        )
+
+    thresholds = scoring_config["cvss_severity_thresholds"]
+    df["CVSS severity (recomputed)"] = df["CVSS base score"].map(
+        lambda value: cvss_severity(value, thresholds)
+    )
+    expected_severity = df["CVSS base score"].map(
+        lambda value: cvss_severity(value, thresholds)
+    )
+    recomputed_mismatch_count = int(
+        (
+            df["CVSS severity (recomputed)"].fillna("").astype(str).str.casefold()
+            != expected_severity.fillna("").astype(str).str.casefold()
+        ).sum()
+    )
+    df["Severity_label_mismatch"] = (
+        df["CVSS severity"].fillna("").astype(str).str.strip().str.casefold()
+        != df["CVSS severity (recomputed)"].fillna("").astype(str).str.casefold()
+    )
+    mismatch_count = int(df["Severity_label_mismatch"].sum())
+    if mismatch_count:
+        st.warning(
+            f"{mismatch_count} source CVSS severity label(s) disagree with the "
+            "numeric score; recomputed labels are used in scoring reports."
+        )
     
     # Background algorithmic risk calculations
     df["Final_Risk_Score_Option_A"] = df.apply(lambda r: calculate_risk_score(r, "Asset_Crit_A", weights), axis=1)
@@ -129,6 +180,8 @@ def main():
         "CVE ID", 
         "Exposure classification", 
         "CVSS base score", 
+        "CVSS severity (recomputed)",
+        "Severity_label_mismatch",
         "Final_Risk_Score_Option_A", 
         "Final_Risk_Score_Option_B", 
         "Final_Risk_Score_Option_C"
@@ -143,6 +196,48 @@ def main():
             )
         ]
         data_quality = cve_level_kev_summary(df_sorted, kev_catalog)
+        data_quality["Record_type"] = "CVE"
+        metric_rows = []
+        for opt, quality in exposure_quality.items():
+            metric_rows.append(
+                {
+                    "Record_type": "Exposure",
+                    "Metric": f"Option {opt} blank exposure values",
+                    "Count": quality["blank_count"],
+                    "Finding IDs": ", ".join(quality["blank_finding_ids"]),
+                }
+            )
+            metric_rows.append(
+                {
+                    "Record_type": "Exposure",
+                    "Metric": f"Option {opt} unmapped exposure values",
+                    "Count": quality["unmapped_count"],
+                    "Values": ", ".join(quality["unmapped_labels"]),
+                    "Finding IDs": ", ".join(quality["unmapped_finding_ids"]),
+                }
+            )
+        metric_rows.append(
+            {
+                "Record_type": "Metric",
+                "Metric": "CVSS severity label mismatches before recomputation",
+                "Count": mismatch_count,
+                "Finding IDs": ", ".join(
+                    df_sorted.loc[
+                        df_sorted["Severity_label_mismatch"], "Finding ID"
+                    ].astype(str)
+                ),
+            }
+        )
+        metric_rows.append(
+            {
+                "Record_type": "Metric",
+                "Metric": "CVSS severity label mismatches after recomputation",
+                "Count": recomputed_mismatch_count,
+            }
+        )
+        data_quality = pd.concat(
+            [data_quality, pd.DataFrame(metric_rows)], ignore_index=True
+        )
         with pd.ExcelWriter(OUTPUT_EXCEL_PATH, engine="openpyxl") as writer:
             df_sorted.to_excel(writer, sheet_name="Scores", index=False)
             kev_review.to_excel(writer, sheet_name="KEV_Review", index=False)

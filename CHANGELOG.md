@@ -36,3 +36,23 @@
   observed range changes from 36.70-63.00 to 37.50-78.00 (76 distinct scores,
   11 findings tied at the maximum).
 - No weights, exposure mappings, or input workbook values changed.
+
+## Phase 3 - Input validation hardening
+
+- Added `engines/scoring_config.json` with documented exposure defaults and
+  CVSS severity thresholds. Blank exposure uses the configured `internal`
+  label; unknown nonblank labels use the configured score of 1, with both cases
+  counted and listed in `Data_Quality` and shown as dashboard warnings.
+- Added case- and whitespace-tolerant exposure mapping with explicit errors
+  when the configured blank-value label is not present in a taxonomy.
+- Added score-derived CVSS severity to the scoring export, retained the source
+  mismatch flag, and switched the CVE-level report and SOC dashboard to display
+  recomputed severity labels. The workbook has 28 mismatches before
+  recomputation and zero after.
+- Fixed the SOC dashboard's taxonomy paths to use `engines/taxonomy_option_*.json`;
+  it previously looked for taxonomy files under `pages/` and silently fell back
+  to criticality 1 for every row.
+- Current dataset before/after counts: 0 blank exposure labels, 0 unmapped
+  labels, and 28 source severity-label mismatches (0 after recomputation).
+  Existing configured fallbacks preserve prior behavior when bad input is
+  encountered; no charter weights or mapping values changed.
