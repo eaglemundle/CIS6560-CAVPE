@@ -132,3 +132,22 @@
   Validation: full pytest suite, Python compilation, and Streamlit AppTest
   rendering for both dashboards passed. AppTest confirmed no scoring workbook
   is created automatically on page render. The input workbook is unchanged.
+
+## Phase 8 - Scoring sensitivity analysis
+
+- Added the standalone, non-Streamlit command `python scripts/sensitivity.py`.
+  It runs the configured Option A baseline, ±10% one-at-a-time weight sweeps
+  (other weights are proportionally rescaled to preserve the total), all three
+  taxonomy options, asset/patch/control/risk-transfer/PoC rule alternatives,
+  and a CVSS-only 0-100 benchmark.
+- Compares each scenario with the current Option A baseline at both finding
+  level and CVE level. CVE scores use the highest finding score per CVE.
+  Reports Kendall's tau, top-30 overlap, absolute score/rank deltas, and
+  per-finding/per-CVE rank movers.
+- One command regenerates `outputs/sensitivity_summary.csv`,
+  `outputs/sensitivity_rank_movers.csv`, and the interactive
+  `outputs/sensitivity_kendall_tau.html` chart. The current run contains 26
+  scenarios, 52 summary rows, and 6,731 finding/CVE rank-mover rows.
+- Added tests for the one-command CLI, both reporting levels, weight-total
+  preservation, and unchanged input/config files. No charter weights,
+  taxonomy mappings, or input workbook values were modified.
