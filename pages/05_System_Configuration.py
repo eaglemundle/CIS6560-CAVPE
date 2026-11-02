@@ -43,4 +43,5 @@ st.markdown("---")
 
 # Environment token status and scan routing traces placed at the very bottom
 st.write(f"**NVD Authorized Token Active:** `{'Yes (Key Detected)' if API_KEY else 'No (Anonymized Request Constraints Apply)'}`")
-st.write(f"**Target Scan Directory Route:** `{REPORTS_DIR}/`")
+
+#st.write(f"**Target Scan Directory Route:** `{REPORTS_DIR}/`")

@@ -6,6 +6,18 @@ import streamlit as st
 BASE_URL = "https://services.nvd.nist.gov/rest/json/cves/2.0"
 API_KEY = os.getenv("NVD_API_KEY", "")
 
+# --- 안전Caveat: 세션 상태에 위험도 가중치(weights)가 없을 경우 대비한 방어 로직 ---
+if "weights" not in st.session_state:
+    st.session_state.weights = {
+        "severity": 0.3,
+        "exploited": 0.25,
+        "poc": 0.15,
+        "patch": 0.1,
+        "controls": 0.1,
+        "asset": 0.1,
+        "transfer": 0.1
+    }
+
 def interpret_risk(score):
     if score <= 6: return "Low", "Routine monitoring is sufficient."
     if score <= 12: return "Medium", "Moderate risk requiring planned remediation."
@@ -31,6 +43,23 @@ def simulated_threat_factors(cvss_score):
     simulated_poc = 2 if cvss_score >= 7.0 else 1 if cvss_score >= 4.0 else 0
     return simulated_exploited, simulated_poc
 
+# --- 캐싱 성능 보존을 위해 전역 스코프로 리팩토링 ---
+@st.cache_data(ttl=600, show_spinner=False)
+def fetch_nvd_data(query_keyword, limit, api_key_present):
+    params = {"resultsPerPage": limit}
+    if query_keyword and query_keyword.strip(): 
+        params["keywordSearch"] = query_keyword.strip()
+    
+    headers = {"apiKey": API_KEY} if api_key_present and API_KEY else {}
+    try:
+        res = requests.get(BASE_URL, headers=headers, params=params, timeout=20)
+        res.raise_for_status()
+        return res.json(), None
+    except Exception as e: 
+        return None, str(e)
+
+
+# --- UI Layout ---
 st.title("NVD API Search Query & Analysis")
 
 with st.container(border=True):
@@ -43,19 +72,9 @@ with st.container(border=True):
 
 if fetch_button:
     with st.spinner("Retrieving vulnerability data from the NVD API..."):
-        @st.cache_data(ttl=600, show_spinner=False)
-        def fetch_nvd_data(query_keyword, limit, api_key_present):
-            params = {"resultsPerPage": limit}
-            if query_keyword and query_keyword.strip(): params["keywordSearch"] = query_keyword.strip()
-            headers = {"apiKey": API_KEY} if api_key_present and API_KEY else {}
-            try:
-                res = requests.get(BASE_URL, headers=headers, params=params, timeout=20)
-                res.raise_for_status()
-                return res.json(), None
-            except Exception as e: return None, str(e)
-
         data, error = fetch_nvd_data(keyword, results_per_page, bool(API_KEY))
-        if error: st.error(error)
+        if error: 
+            st.error(error)
         elif data:
             st.session_state.nvd_data = data
             st.session_state.has_fetched = True
@@ -84,7 +103,11 @@ elif st.session_state.get("nvd_data"):
                 break
 
         sim_exploited, sim_poc = simulated_threat_factors(cvss_score)
-        final_score = calculate_risk_score(cvss_score, sim_exploited, sim_poc, patch_score=2.0, control_score=1.0, asset_score=3.0, acceptance_score=0, weights=st.session_state.weights)
+        final_score = calculate_risk_score(
+            cvss_score, sim_exploited, sim_poc, 
+            patch_score=2.0, control_score=1.0, asset_score=3.0, acceptance_score=0, 
+            weights=st.session_state.weights
+        )
         risk_level, risk_interpretation = interpret_risk(final_score)
 
         cve_records.append({
