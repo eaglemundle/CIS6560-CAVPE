@@ -6,7 +6,7 @@ from typing import Any
 import pandas as pd
 from scipy.stats import kendalltau
 
-from engines.scoring import calculate_risk_score, rank_findings
+from engines.scoring import calculate_risk_scores, rank_findings
 
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
@@ -85,11 +85,8 @@ def compare_asset_criticality_modes(
         criticality = asset_criticality_scores(data, exposure_scores, config, mode)
         rows = data.copy()
         rows["Asset_Criticality_Mode"] = criticality
-        scores = rows.apply(
-            lambda row: calculate_risk_score(
-                row, "Asset_Criticality_Mode", weight_dict, scoring_config
-            ),
-            axis=1,
+        scores = calculate_risk_scores(
+            rows, "Asset_Criticality_Mode", weight_dict, scoring_config
         )
         ranks = _rank_scores(scores, rows)
         rank_by_mode[mode] = ranks

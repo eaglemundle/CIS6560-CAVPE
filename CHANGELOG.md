@@ -111,3 +111,24 @@
 - Current rescaled band counts (Low/Medium/High/Critical): Option A 0/6/193/101,
   Option B 0/8/202/90, Option C 0/5/186/109. Native-scale counts: A
   0/7/174/119, B 0/9/180/111, C 0/6/171/123. Each mode totals 300 findings.
+
+## Phase 7 - Reproducible scoring pipeline and exports
+
+- Added a shared pure-data scoring pipeline and vectorized risk-score
+  calculation used by both dashboards and asset-criticality comparisons.
+  Retained the row-wise scoring wrapper for existing callers and regression
+  tests.
+- Cached input workbook reads with file modification time and size in the cache
+  key, and cached scoring results from their input/configuration arguments.
+- Added run provenance for input/configuration hashes, config/taxonomy/KEV
+  versions, weights, Python and key package versions, and Git commit.
+- Scoring workbooks are written only after an explicit export action. The
+  shared writer produces `Scores`, `KEV_Review`, `Data_Quality`, and `Run_Info`
+  sheets under `outputs/`; both dashboards now use it.
+- Replaced the SOC dashboard's broken subprocess control, which referenced a
+  nonexistent `SCORING_SCRIPT_PATH`, with the shared explicit export action.
+- Added tests for vectorized/wrapper equivalence within `1e-9`, cache
+  invalidation after workbook changes, and all four export worksheets.
+  Validation: full pytest suite, Python compilation, and Streamlit AppTest
+  rendering for both dashboards passed. AppTest confirmed no scoring workbook
+  is created automatically on page render. The input workbook is unchanged.

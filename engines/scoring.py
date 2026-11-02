@@ -3,30 +3,35 @@
 import pandas as pd
 
 
-def calculate_risk_score(
-    row: pd.Series,
+def calculate_risk_scores(
+    data: pd.DataFrame,
     asset_crit_column: str,
     weight_dict: dict[str, float],
     scoring_config: dict[str, object] | None = None,
-) -> float:
+) -> pd.Series:
     severity = (
-        row["CVSS base score"] / 10.0
-        if pd.notna(row.get("CVSS base score"))
-        else 0.0
+        pd.to_numeric(data["CVSS base score"], errors="raise").fillna(0) / 10.0
     )
-    exploited = (
-        row["Exploited_score"] / 2.0
-        if "Exploited_score" in row
-        else (
-            1.0
-            if str(row.get("Exploitation context", "")).strip().lower() == "active"
-            else 0.0
+    if "Exploited_score" in data:
+        exploited = pd.to_numeric(
+            data["Exploited_score"], errors="raise"
+        ) / 2.0
+    else:
+        exploited = (
+            data.get("Exploitation context", pd.Series("", index=data.index))
+            .astype(str)
+            .str.strip()
+            .str.lower()
+            .eq("active")
+            .astype(float)
         )
-    )
-    criticality = row[asset_crit_column] / 4.0
+    criticality = pd.to_numeric(data[asset_crit_column], errors="raise") / 4.0
 
     if scoring_config is None:
-        poc, patch, controls, transfer = 0.5, 0.5, 0.3, 0.0
+        poc = pd.Series(0.5, index=data.index)
+        patch = pd.Series(0.5, index=data.index)
+        controls = pd.Series(0.3, index=data.index)
+        transfer = pd.Series(0.0, index=data.index)
         transfer_mode = "additive"
         minimum_score = 0.0
     else:
@@ -36,15 +41,15 @@ def calculate_risk_score(
             "Controls_norm",
             "Transfer_norm",
         )
-        missing = [column for column in required_dimensions if column not in row]
+        missing = [column for column in required_dimensions if column not in data]
         if missing:
             raise ValueError(
                 f"Missing prepared scoring dimensions: {', '.join(missing)}"
             )
-        poc = row["PoC_norm"]
-        patch = row["Patch_norm"]
-        controls = row["Controls_norm"]
-        transfer = row["Transfer_norm"]
+        poc = pd.to_numeric(data["PoC_norm"], errors="raise")
+        patch = pd.to_numeric(data["Patch_norm"], errors="raise")
+        controls = pd.to_numeric(data["Controls_norm"], errors="raise")
+        transfer = pd.to_numeric(data["Transfer_norm"], errors="raise")
         transfer_mode = scoring_config["risk_transfer_mode"]
         minimum_score = float(scoring_config["risk_transfer_min_score"])
         if transfer_mode not in {"reducer", "additive"}:
@@ -67,8 +72,21 @@ def calculate_risk_score(
         weighted_score += transfer_adjustment
 
     if scoring_config is None:
-        return round(max(minimum_score, weighted_score), 2)
-    return max(minimum_score, weighted_score)
+        return weighted_score.clip(lower=minimum_score).round(2)
+    return weighted_score.clip(lower=minimum_score)
+
+
+def calculate_risk_score(
+    row: pd.Series,
+    asset_crit_column: str,
+    weight_dict: dict[str, float],
+    scoring_config: dict[str, object] | None = None,
+) -> float:
+    """Row-wise wrapper retained for tests and small callers."""
+    result = calculate_risk_scores(
+        pd.DataFrame([row]), asset_crit_column, weight_dict, scoring_config
+    )
+    return float(result.iloc[0])
 
 
 def rank_findings(data: pd.DataFrame, score_column: str) -> pd.Series:

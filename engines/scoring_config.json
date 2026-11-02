@@ -1,4 +1,6 @@
 {
+  "_note_version": "Scoring configuration schema version included in exported run provenance.",
+  "version": "2.0.0",
   "_note_exposure_default_label": "Label used for blank exposure values. Each such value is counted and reported.",
   "exposure_default_label": "internal",
   "_note_exposure_default_score": "Criticality used for unknown nonblank labels. Each such value is counted and reported.",

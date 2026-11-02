@@ -1,22 +1,18 @@
 import json
 import os
-import subprocess
-import sys
 import numpy as np
 import pandas as pd
 import plotly.express as px
 import streamlit as st
-from engines.kev_validation import catalog_warning, load_kev, validate_exploitation
-from engines.scoring_validation import cvss_severity, map_exposure_classification
-from engines.dimension_scores import add_dimension_scores
+from engines.kev_validation import catalog_warning, load_kev
 from engines.asset_criticality import (
-    asset_criticality_scores,
-    asset_tier_scores,
     compare_asset_criticality_modes,
     write_asset_criticality_comparison,
 )
-from engines.scoring import calculate_risk_score, rank_findings
-from engines.risk_bands import add_risk_band_columns, build_band_distribution
+from engines.scoring_pipeline import score_dataset
+from engines.risk_bands import build_band_distribution
+from engines.reporting import write_scoring_export
+from engines.run_info import build_run_info
 
 # 1. Page Configuration
 st.set_page_config(
@@ -51,8 +47,7 @@ P_DIR = os.path.dirname(S_DIR)
 W_CONF = os.path.join(P_DIR, "engines", "weight_config.json")
 S_CONF = os.path.join(P_DIR, "engines", "scoring_config.json")
 TAX_FILES = {k: os.path.join(P_DIR, "engines", f"taxonomy_option_{k.lower()}.json") for k in ["A", "B", "C"]}
-SCORING_SCRIPT_PATH = os.path.join(P_DIR, "engines", "scoring.py")
-OUTPUT_EXCEL_PATH = os.path.join(S_DIR, "multi_taxonomy_weighted_risk_model.xlsx")
+OUTPUT_EXCEL_PATH = os.path.join(P_DIR, "outputs", "multi_taxonomy_weighted_risk_model.xlsx")
 
 # 3. Mathematical Risk Engine
 def get_matrix_config(opt_letter):
@@ -68,25 +63,45 @@ def get_matrix_config(opt_letter):
     return weights, mapping
 
 # 4. Data Ingestion
-@st.cache_data
+@st.cache_data(show_spinner=False)
+def read_input_data(path, modified_ns, size):
+    return pd.read_excel(path, engine="openpyxl") if path.endswith(".xlsx") else pd.read_csv(path)
+
 def load_data():
-    p1, p2 = os.path.join("reference_data", "vulnerability_cisa_kev_enriched.xlsx"), "vulnerability_contextualization_scanner_sample_updated.xlsx"
-    if not os.path.exists(p1) and os.path.exists(os.path.join(P_DIR, "reference_data", p2)): p2 = os.path.join(P_DIR, "reference_data", p2)
-    tgt = p1 if os.path.exists(p1) else (p2 if os.path.exists(p2) else None)
-    if not tgt: return pd.DataFrame()
-    df = pd.read_excel(tgt, engine="openpyxl") if tgt.endswith(".xlsx") else pd.read_csv(tgt)
+    candidates = [
+        os.path.join(
+            P_DIR, "reference_data", "vulnerability_cisa_kev_enriched.xlsx"
+        ),
+        os.path.join(
+            P_DIR,
+            "reference_data",
+            "vulnerability_contextualization_scanner_sample_updated.xlsx",
+        ),
+    ]
+    tgt = next((path for path in candidates if os.path.exists(path)), None)
+    if not tgt:
+        return pd.DataFrame(), None, 0
+    stats = os.stat(tgt)
+    df = read_input_data(tgt, stats.st_mtime_ns, stats.st_size)
     if "CISA KEV Status" not in df.columns:
         df["CISA KEV Status"] = np.where(df.get("Exploitation context", "").astype(str).str.lower().str.contains("known exploited"), "Confirmed - Active Exploitation", "Standard Monitored")
-    return df[df["Finding ID"].astype(str).str.startswith("VULN-", na=False)].head(300)
+    input_rows = len(df)
+    scored_data = df[df["Finding ID"].astype(str).str.startswith("VULN-", na=False)].head(300)
+    return scored_data, tgt, input_rows
 
 # Load compiled model from scoring.py if available
 def load_compiled_model_data():
     if os.path.exists(OUTPUT_EXCEL_PATH):
         try:
             return pd.read_excel(OUTPUT_EXCEL_PATH, engine="openpyxl")
-        except:
+        except (OSError, ValueError, KeyError) as error:
+            st.error(f"Could not read the latest scoring export: {error}")
             return None
     return None
+
+@st.cache_data(show_spinner=False)
+def cached_score_data(data, weights, mappings, scoring_config, kev_catalog):
+    return score_dataset(data, weights, mappings, scoring_config, kev_catalog)
 
 if "active_taxonomy" not in st.session_state: st.session_state.active_taxonomy = "Option B"
 
@@ -116,7 +131,7 @@ with btn_c:
 st.markdown("---")
 
 # 6. Engine Processing
-v_data = load_data()
+v_data, input_path, input_rows = load_data()
 kev_catalog = load_kev()
 kev_notice = catalog_warning(kev_catalog)
 if kev_notice:
@@ -127,32 +142,24 @@ elif kev_catalog:
         f"{kev_catalog.date_released.date()}."
     )
 if not v_data.empty:
-    v_data = validate_exploitation(v_data, kev_catalog)
     with open(S_CONF, "r", encoding="utf-8") as scoring_config_file:
         scoring_config = json.load(scoring_config_file)
-    v_data, dimension_quality = add_dimension_scores(v_data, scoring_config)
-    v_data["Asset_Tier_Score"] = asset_tier_scores(
-        v_data, scoring_config["asset_criticality"]["tier_scores"]
+    with open(W_CONF, "r", encoding="utf-8") as weight_file:
+        weight_config = json.load(weight_file)
+    weight_dict = weight_config["weights"]
+    taxonomy_mappings = {
+        option: get_matrix_config(option)[1] for option in "ABC"
+    }
+    v_data, scoring_quality, option_a_exposure = cached_score_data(
+        v_data, weight_dict, taxonomy_mappings, scoring_config, kev_catalog
     )
-    v_data["CISA KEV Status"] = np.where(
-        v_data["Exploited_score"] == 2,
-        "Confirmed - Active Exploitation",
-        "Standard Monitored",
-    )
-    severity_thresholds = scoring_config["cvss_severity_thresholds"]
-    v_data["CVSS severity (source)"] = v_data["CVSS severity"]
-    v_data["CVSS severity"] = v_data["CVSS base score"].map(
-        lambda value: cvss_severity(value, severity_thresholds)
-    )
-    v_data["Severity_label_mismatch"] = (
-        v_data["CVSS severity (source)"].fillna("").astype(str).str.strip().str.casefold()
-        != v_data["CVSS severity"].fillna("").astype(str).str.casefold()
-    )
-    severity_mismatches = int(v_data["Severity_label_mismatch"].sum())
-    if severity_mismatches:
+    dimension_quality = scoring_quality["dimension"]
+    exposure_quality = scoring_quality["exposure"]
+    if scoring_quality["severity_mismatches_before"]:
         st.warning(
-            f"{severity_mismatches} source CVSS severity label(s) disagree with "
-            "the numeric score; recomputed labels are displayed."
+            f"{scoring_quality['severity_mismatches_before']} source CVSS "
+            "severity label(s) disagree with the numeric score; recomputed labels "
+            "are displayed."
         )
     if dimension_quality["controls_unmatched_count"]:
         st.warning(
@@ -164,47 +171,17 @@ if not v_data.empty:
             f"{dimension_quality['unknown_count']} patch-complexity value(s) "
             "used the configured default."
         )
-    option_a_weights, option_a_mapping = get_matrix_config("A")
-    option_a_exposure, _ = map_exposure_classification(
-        v_data, option_a_mapping, scoring_config
-    )
     asset_mode_comparison = compare_asset_criticality_modes(
         v_data,
         option_a_exposure,
         scoring_config["asset_criticality"],
-        option_a_weights,
+        weight_dict,
         scoring_config,
     )
     write_asset_criticality_comparison(asset_mode_comparison)
     st.caption(
         "Option A comparison uses synthetic asset-tier counts and control descriptions."
     )
-    v_data = v_data.drop(columns=["CVSS severity (source)"])
-    exposure_quality = {}
-    for opt in "ABC":
-        weights, taxonomy_map = get_matrix_config(opt)
-        asset_scores, quality = map_exposure_classification(
-            v_data, taxonomy_map, scoring_config
-        )
-        exposure_quality[opt] = quality
-        if opt == "A":
-            asset_scores = asset_criticality_scores(
-                v_data, asset_scores, scoring_config
-            )
-        asset_column = f"Asset_Crit_{opt}"
-        v_data[asset_column] = asset_scores
-        raw_score_column = f"Unrounded_Risk_Score_Option_{opt}"
-        v_data[raw_score_column] = v_data.apply(
-            lambda row: calculate_risk_score(
-                row, asset_column, weights, scoring_config
-            ),
-            axis=1,
-        )
-        v_data[f"Final_Risk_Score_Option_{opt}"] = v_data[
-            raw_score_column
-        ].round(2)
-        v_data[f"Rank_Option_{opt}"] = rank_findings(v_data, raw_score_column)
-    v_data = add_risk_band_columns(v_data, scoring_config)
     band_distribution = build_band_distribution(v_data, scoring_config)
     band_output_path = os.path.join(P_DIR, "outputs", "band_distribution.csv")
     os.makedirs(os.path.dirname(band_output_path), exist_ok=True)
@@ -363,22 +340,30 @@ with t3: render_q(v_data)
 
 
 
-# System Control Room Section to execute the backend script
-st.subheader("Backend Engine Control Room")
-if st.button("Execute Scoring Engine (scoring.py)", width="stretch", type="primary"):
-    if os.path.exists(SCORING_SCRIPT_PATH):
-        with st.spinner("Executing background mathematical calculations via scoring.py..."):
-            try:
-                result = subprocess.run(
-                    [sys.executable, SCORING_SCRIPT_PATH],
-                    capture_output=True, text=True, check=True
-                )
-                st.success("Scoring Engine compiled and completed successfully.")
-                st.cache_data.clear()
-                st.rerun()
-            except subprocess.CalledProcessError as e:
-                st.error(f"Execution Error inside scoring.py script pipeline: {e.stderr}")
-            except Exception as ex:
-                st.error(f"Unexpected operational error during subsystem routing: {ex}")
+# Scoring is calculated above; write the workbook only after an explicit request.
+st.subheader("Scoring Results Export")
+if not v_data.empty and st.button(
+    "Export scoring results", width="stretch", type="primary"
+):
+    if input_path is None:
+        st.error("Cannot export scoring results because the input workbook was not found.")
     else:
-        st.error(f"Target executable background script not found at absolute path destination: {SCORING_SCRIPT_PATH}")
+        run_info = build_run_info(
+            P_DIR,
+            input_path,
+            input_rows,
+            W_CONF,
+            weight_config,
+            S_CONF,
+            scoring_config,
+            TAX_FILES,
+            kev_catalog,
+        )
+        export_path = write_scoring_export(
+            v_data,
+            scoring_quality,
+            kev_catalog,
+            run_info,
+            OUTPUT_EXCEL_PATH,
+        )
+        st.success(f"Scoring export created: {export_path}")
