@@ -1,15 +1,25 @@
 import streamlit as st, pandas as pd, plotly.express as px, os, io, json
 from datetime import datetime
+from engines.scoring_validation import cvss_severity
 
 st.set_page_config(page_title="CVE-level analysis", layout="wide")
 st.title("CVE-Level Analysis, Baseline ranked list v0")
 st.markdown("CVSS-only Baseline Prioritization Report with Deduplication (Press Ctrl+P to save as PDF)")
+
+ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+SCORING_CONFIG_PATH = os.path.join(ROOT_DIR, "engines", "scoring_config.json")
 
 @st.cache_data
 def load_data(path):
     if not os.path.exists(path): return pd.DataFrame(columns=["Finding ID", "CVE ID", "Vulnerability title", "Affected product", "Asset group", "CVSS base score", "CVSS severity", "Internet-facing assets", "Total affected assets"])
     df = pd.read_excel(path)
     for c in df.select_dtypes(include=['object', 'string']).columns: df[c] = df[c].astype(str).str.strip()
+    with open(SCORING_CONFIG_PATH, encoding="utf-8") as config_file:
+        severity_thresholds = json.load(config_file)["cvss_severity_thresholds"]
+    df["CVSS severity (source)"] = df["CVSS severity"]
+    df["CVSS severity"] = df["CVSS base score"].map(
+        lambda value: cvss_severity(value, severity_thresholds)
+    )
     return df
 
 df = load_data("reference_data/vulnerability_contextualization_scanner_sample_updated.xlsx")

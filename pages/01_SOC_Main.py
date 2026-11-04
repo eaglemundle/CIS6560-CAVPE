@@ -1,11 +1,18 @@
 import json
 import os
-import subprocess
-import sys
 import numpy as np
 import pandas as pd
 import plotly.express as px
 import streamlit as st
+from engines.kev_validation import catalog_warning, load_kev
+from engines.asset_criticality import (
+    compare_asset_criticality_modes,
+    write_asset_criticality_comparison,
+)
+from engines.scoring_pipeline import score_dataset
+from engines.risk_bands import build_band_distribution
+from engines.reporting import write_scoring_export
+from engines.run_info import build_run_info
 
 # 1. Page Configuration
 st.set_page_config(
@@ -38,49 +45,63 @@ P_DIR = os.path.dirname(S_DIR)
 
 # Synced path to look inside the 'engines' subfolder for absolute consistency
 W_CONF = os.path.join(P_DIR, "engines", "weight_config.json")
-TAX_FILES = {k: os.path.join(S_DIR, f"taxonomy_option_{k.lower()}.json") for k in ["A", "B", "C"]}
-SCORING_SCRIPT_PATH = os.path.join(P_DIR, "engines", "scoring.py")
-OUTPUT_EXCEL_PATH = os.path.join(S_DIR, "multi_taxonomy_weighted_risk_model.xlsx")
+S_CONF = os.path.join(P_DIR, "engines", "scoring_config.json")
+TAX_FILES = {k: os.path.join(P_DIR, "engines", f"taxonomy_option_{k.lower()}.json") for k in ["A", "B", "C"]}
+OUTPUT_EXCEL_PATH = os.path.join(P_DIR, "outputs", "multi_taxonomy_weighted_risk_model.xlsx")
 
 # 3. Mathematical Risk Engine
 def get_matrix_config(opt_letter):
-    w, m = {}, {}
-    if os.path.exists(W_CONF):
-        try: w = json.load(open(W_CONF, "r", encoding="utf-8")).get("weights", {})
-        except: pass
-    t_path = TAX_FILES.get(opt_letter, "")
-    if os.path.exists(t_path):
-        try: m = {str(k).strip().lower(): v for k, v in json.load(open(t_path, "r", encoding="utf-8")).get("exposure_classification_mapping", {}).items()}
-        except: pass
-    return w, m
-
-def calc_risk(row, asset_val, w):
-    v_sev = (row["CVSS base score"] / 10.0) if pd.notna(row.get("CVSS base score")) else 0.0
-    v_exp = 1.0 if "active" in str(row.get("Exploitation context", "")).lower() else 0.0
-    return round(((v_sev * w.get("severity", 0.4)) + (v_exp * w.get("exploited_in_the_wild", 0.15)) + 
-                  (0.5 * w.get("poc_exploit_availability", 0.1)) + (0.5 * w.get("patch_difficulty", 0.1)) + 
-                  (0.3 * w.get("compensating_controls", 0.1)) + ((asset_val / 4.0) * w.get("asset_criticality", 0.1))) * 100.0, 2)
+    with open(W_CONF, "r", encoding="utf-8") as weight_file:
+        weights = json.load(weight_file).get("weights", {})
+    with open(TAX_FILES[opt_letter], "r", encoding="utf-8") as taxonomy_file:
+        mapping = {
+            str(key).strip().lower(): value
+            for key, value in json.load(taxonomy_file)
+            .get("exposure_classification_mapping", {})
+            .items()
+        }
+    return weights, mapping
 
 # 4. Data Ingestion
-@st.cache_data
+@st.cache_data(show_spinner=False)
+def read_input_data(path, modified_ns, size):
+    return pd.read_excel(path, engine="openpyxl") if path.endswith(".xlsx") else pd.read_csv(path)
+
 def load_data():
-    p1, p2 = os.path.join("reference_data", "vulnerability_cisa_kev_enriched.xlsx"), "vulnerability_contextualization_scanner_sample_updated.xlsx"
-    if not os.path.exists(p1) and os.path.exists(os.path.join(P_DIR, "reference_data", p2)): p2 = os.path.join(P_DIR, "reference_data", p2)
-    tgt = p1 if os.path.exists(p1) else (p2 if os.path.exists(p2) else None)
-    if not tgt: return pd.DataFrame()
-    df = pd.read_excel(tgt, engine="openpyxl") if tgt.endswith(".xlsx") else pd.read_csv(tgt)
+    candidates = [
+        os.path.join(
+            P_DIR, "reference_data", "vulnerability_cisa_kev_enriched.xlsx"
+        ),
+        os.path.join(
+            P_DIR,
+            "reference_data",
+            "vulnerability_contextualization_scanner_sample_updated.xlsx",
+        ),
+    ]
+    tgt = next((path for path in candidates if os.path.exists(path)), None)
+    if not tgt:
+        return pd.DataFrame(), None, 0
+    stats = os.stat(tgt)
+    df = read_input_data(tgt, stats.st_mtime_ns, stats.st_size)
     if "CISA KEV Status" not in df.columns:
         df["CISA KEV Status"] = np.where(df.get("Exploitation context", "").astype(str).str.lower().str.contains("known exploited"), "Confirmed - Active Exploitation", "Standard Monitored")
-    return df[df["Finding ID"].astype(str).str.startswith("VULN-", na=False)].head(300)
+    input_rows = len(df)
+    scored_data = df[df["Finding ID"].astype(str).str.startswith("VULN-", na=False)].head(300)
+    return scored_data, tgt, input_rows
 
 # Load compiled model from scoring.py if available
 def load_compiled_model_data():
     if os.path.exists(OUTPUT_EXCEL_PATH):
         try:
             return pd.read_excel(OUTPUT_EXCEL_PATH, engine="openpyxl")
-        except:
+        except (OSError, ValueError, KeyError) as error:
+            st.error(f"Could not read the latest scoring export: {error}")
             return None
     return None
+
+@st.cache_data(show_spinner=False)
+def cached_score_data(data, weights, mappings, scoring_config, kev_catalog):
+    return score_dataset(data, weights, mappings, scoring_config, kev_catalog)
 
 if "active_taxonomy" not in st.session_state: st.session_state.active_taxonomy = "Option B"
 
@@ -110,30 +131,113 @@ with btn_c:
 st.markdown("---")
 
 # 6. Engine Processing
-v_data = load_data()
-is_dyn = not v_data.empty and "Exposure classification" in v_data.columns and st.session_state.active_taxonomy != "None"
+v_data, input_path, input_rows = load_data()
+kev_catalog = load_kev()
+kev_notice = catalog_warning(kev_catalog)
+if kev_notice:
+    st.warning(kev_notice)
+elif kev_catalog:
+    st.caption(
+        f"CISA KEV snapshot {kev_catalog.version}, released "
+        f"{kev_catalog.date_released.date()}."
+    )
+if not v_data.empty:
+    with open(S_CONF, "r", encoding="utf-8") as scoring_config_file:
+        scoring_config = json.load(scoring_config_file)
+    with open(W_CONF, "r", encoding="utf-8") as weight_file:
+        weight_config = json.load(weight_file)
+    weight_dict = weight_config["weights"]
+    taxonomy_mappings = {
+        option: get_matrix_config(option)[1] for option in "ABC"
+    }
+    v_data, scoring_quality, option_a_exposure = cached_score_data(
+        v_data, weight_dict, taxonomy_mappings, scoring_config, kev_catalog
+    )
+    dimension_quality = scoring_quality["dimension"]
+    exposure_quality = scoring_quality["exposure"]
+    if scoring_quality["severity_mismatches_before"]:
+        st.warning(
+            f"{scoring_quality['severity_mismatches_before']} source CVSS "
+            "severity label(s) disagree with the numeric score; recomputed labels "
+            "are displayed."
+        )
+    if dimension_quality["controls_unmatched_count"]:
+        st.warning(
+            f"{dimension_quality['controls_unmatched_count']} findings have "
+            "control text that matched no configured category."
+        )
+    if dimension_quality["unknown_count"]:
+        st.warning(
+            f"{dimension_quality['unknown_count']} patch-complexity value(s) "
+            "used the configured default."
+        )
+    asset_mode_comparison = compare_asset_criticality_modes(
+        v_data,
+        option_a_exposure,
+        scoring_config["asset_criticality"],
+        weight_dict,
+        scoring_config,
+    )
+    write_asset_criticality_comparison(asset_mode_comparison)
+    st.caption(
+        "Option A comparison uses synthetic asset-tier counts and control descriptions."
+    )
+    band_distribution = build_band_distribution(v_data, scoring_config)
+    band_output_path = os.path.join(P_DIR, "outputs", "band_distribution.csv")
+    os.makedirs(os.path.dirname(band_output_path), exist_ok=True)
+    band_distribution.to_csv(band_output_path, index=False)
+    st.caption(
+        f"Risk bands use {scoring_config['risk_bands']['mode']}; distributions "
+        "for both scales are saved under outputs/."
+    )
 
+is_dyn = not v_data.empty and "Exposure classification" in v_data.columns and st.session_state.active_taxonomy != "None"
 if is_dyn:
-    w_mat, tax_map = get_matrix_config(st.session_state.active_taxonomy[-1])
-    a_scores = v_data["Exposure classification"].astype(str).str.strip().str.lower().map(tax_map).fillna(1).astype(int)
-    v_data["Normalized Score"] = v_data.apply(lambda r: calc_risk(r, a_scores.loc[r.name], w_mat), axis=1)
+    active_opt = st.session_state.active_taxonomy[-1]
+    v_data["Normalized Score"] = v_data[
+        f"Unrounded_Risk_Score_Option_{active_opt}"
+    ]
+    active_quality = exposure_quality[active_opt]
+    if active_quality["blank_count"] or active_quality["unmapped_count"]:
+        st.warning(
+            "Exposure data quality: "
+            f"{active_quality['blank_count']} blank value(s), "
+            f"{active_quality['unmapped_count']} unmapped value(s). "
+            "Configured defaults were applied."
+        )
+        exposure = v_data["Exposure classification"]
+        missing = exposure.isna() | exposure.astype(str).str.strip().eq("")
+        unknown = (
+            exposure.astype(str)
+            .str.strip()
+            .str.lower()
+            .map(get_matrix_config(active_opt)[1])
+            .isna()
+            & ~missing
+        )
+        st.dataframe(
+            v_data.loc[missing | unknown, ["Finding ID", "Exposure classification"]]
+        )
 
 # 7. UI Metrics & Charts
 tot = len(v_data)
 s_col = "Normalized Score" if is_dyn else "CVSS base score"
-h_thresh = 75.0 if is_dyn else 8.0
 
 # Calculate Contextual Priority metrics dynamically based on configuration threshold rules
 if is_dyn:
-    priority_count = len(v_data[v_data["Normalized Score"] >= 85.0]) if tot > 0 else 0
-    priority_label = "Contextual Priority (Score >= 85)"
+    active_opt = st.session_state.active_taxonomy[-1]
+    risk_level_column = f"Risk_Level_Option_{active_opt}"
+    priority_count = int(v_data[risk_level_column].eq("Critical").sum())
+    high_count = int(v_data[risk_level_column].isin(["High", "Critical"]).sum())
+    priority_label = "Contextual Priority (Critical band)"
 else:
     priority_count = len(v_data[v_data["CVSS base score"] >= 9.0]) if tot > 0 else 0
     priority_label = "Contextual Priority (CVSS >= 9.0)"
+    high_count = len(v_data[v_data["CVSS base score"] >= 7.0])
 
 c2, c3, c4, c1 = st.columns(4)
 c2.metric(priority_label, f"{priority_count:,}")
-c3.metric(f"High Risk Threshold (>= {h_thresh})", len(v_data[v_data[s_col] >= h_thresh]) if tot > 0 else 0)
+c3.metric("High or Critical Risk Band" if is_dyn else "High Risk (CVSS >= 7.0)", high_count)
 
 count_2026 = v_data['CVE ID'].astype(str).str.startswith('CVE-2026').sum()
 count_2026_unique = v_data[v_data['CVE ID'].astype(str).str.startswith('CVE-2026')]['CVE ID'].nunique()
@@ -236,22 +340,30 @@ with t3: render_q(v_data)
 
 
 
-# System Control Room Section to execute the backend script
-st.subheader("Backend Engine Control Room")
-if st.button("Execute Scoring Engine (scoring.py)", width="stretch", type="primary"):
-    if os.path.exists(SCORING_SCRIPT_PATH):
-        with st.spinner("Executing background mathematical calculations via scoring.py..."):
-            try:
-                result = subprocess.run(
-                    [sys.executable, SCORING_SCRIPT_PATH],
-                    capture_output=True, text=True, check=True
-                )
-                st.success("Scoring Engine compiled and completed successfully.")
-                st.cache_data.clear()
-                st.rerun()
-            except subprocess.CalledProcessError as e:
-                st.error(f"Execution Error inside scoring.py script pipeline: {e.stderr}")
-            except Exception as ex:
-                st.error(f"Unexpected operational error during subsystem routing: {ex}")
+# Scoring is calculated above; write the workbook only after an explicit request.
+st.subheader("Scoring Results Export")
+if not v_data.empty and st.button(
+    "Export scoring results", width="stretch", type="primary"
+):
+    if input_path is None:
+        st.error("Cannot export scoring results because the input workbook was not found.")
     else:
-        st.error(f"Target executable background script not found at absolute path destination: {SCORING_SCRIPT_PATH}")
+        run_info = build_run_info(
+            P_DIR,
+            input_path,
+            input_rows,
+            W_CONF,
+            weight_config,
+            S_CONF,
+            scoring_config,
+            TAX_FILES,
+            kev_catalog,
+        )
+        export_path = write_scoring_export(
+            v_data,
+            scoring_quality,
+            kev_catalog,
+            run_info,
+            OUTPUT_EXCEL_PATH,
+        )
+        st.success(f"Scoring export created: {export_path}")

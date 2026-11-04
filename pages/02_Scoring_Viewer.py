@@ -1,125 +1,231 @@
-"""
-Title: Automated Multi-Taxonomy Risk Scoring Engine
-Author: Myunghee Jung
-Date: 2026-10-26
-Description: 
-"""
+"""Automated multi-taxonomy vulnerability risk scoring viewer."""
 
 import json
-import os
-import sys
+from pathlib import Path
+
 import pandas as pd
-import streamlit as st  
+import streamlit as st
 
-# Absolute path resolution logic
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+from engines.asset_criticality import (
+    compare_asset_criticality_modes,
+    write_asset_criticality_comparison,
+)
+from engines.kev_validation import (
+    DEFAULT_KEV_PATH,
+    catalog_warning,
+    load_kev,
+)
+from engines.risk_bands import build_band_distribution
+from engines.run_info import build_run_info
+from engines.reporting import write_scoring_export
+from engines.scoring import calculate_risk_score
+from engines.scoring_pipeline import score_dataset
 
-WEIGHT_CONFIG_PATH = os.path.join(SCRIPT_DIR, "../engines/weight_config.json")
+
+ROOT_DIR = Path(__file__).resolve().parents[1]
+ENGINE_DIR = ROOT_DIR / "engines"
+WEIGHT_CONFIG_PATH = ENGINE_DIR / "weight_config.json"
+SCORING_CONFIG_PATH = ENGINE_DIR / "scoring_config.json"
 TAXONOMY_FILES = {
-    "A": os.path.join(SCRIPT_DIR, "../engines/taxonomy_option_a.json"),
-    "B": os.path.join(SCRIPT_DIR, "../engines/taxonomy_option_b.json"),
-    "C": os.path.join(SCRIPT_DIR, "../engines/taxonomy_option_c.json")
+    option: ENGINE_DIR / f"taxonomy_option_{option.lower()}.json"
+    for option in "ABC"
 }
-INPUT_EXCEL_PATH = os.path.join(SCRIPT_DIR, "../reference_data", "vulnerability_contextualization_scanner_sample_updated.xlsx")
-OUTPUT_EXCEL_PATH = os.path.join(SCRIPT_DIR, "multi_taxonomy_weighted_risk_model.xlsx")
+INPUT_EXCEL_PATH = (
+    ROOT_DIR
+    / "reference_data"
+    / "vulnerability_contextualization_scanner_sample_updated.xlsx"
+)
+OUTPUT_DIR = ROOT_DIR / "outputs"
+OUTPUT_EXCEL_PATH = OUTPUT_DIR / "multi_taxonomy_weighted_risk_model.xlsx"
+
 
 def load_weights():
-    """Loads weight settings dynamically from disk and validates mathematical total sum bounds."""
-    if not os.path.exists(WEIGHT_CONFIG_PATH) or os.path.getsize(WEIGHT_CONFIG_PATH) == 0:
-        st.error("CRITICAL ERROR: Weight configuration file is missing or empty.")
+    if not WEIGHT_CONFIG_PATH.is_file() or WEIGHT_CONFIG_PATH.stat().st_size == 0:
+        st.error(f"Weight configuration file is missing or empty: {WEIGHT_CONFIG_PATH}")
         return None
-    with open(WEIGHT_CONFIG_PATH, "r", encoding="utf-8") as f:
+    with WEIGHT_CONFIG_PATH.open(encoding="utf-8") as weight_file:
         try:
-            weight_data = json.load(f)
+            return json.load(weight_file)
         except json.JSONDecodeError:
-            st.error("CRITICAL ERROR: Weight file contains invalid JSON.")
+            st.error(f"Weight configuration contains invalid JSON: {WEIGHT_CONFIG_PATH}")
             return None
-    return weight_data.get("weights", {})
+
 
 def load_taxonomies():
-    """Parses mappings dynamically out of the external JSON files."""
-    maps = {}
-    for opt, filename in TAXONOMY_FILES.items():
-        if not os.path.exists(filename) or os.path.getsize(filename) == 0:
-            st.error(f"CRITICAL ERROR: Taxonomy file {opt} is missing or empty.")
+    mappings = {}
+    for option, path in TAXONOMY_FILES.items():
+        if not path.is_file() or path.stat().st_size == 0:
+            st.error(f"Taxonomy file {option} is missing or empty: {path}")
             return None
-        with open(filename, "r", encoding="utf-8") as f:
+        with path.open(encoding="utf-8") as taxonomy_file:
             try:
-                data = json.load(f)
-                maps[opt] = data.get("exposure_classification_mapping", {})
+                mappings[option] = json.load(taxonomy_file)[
+                    "exposure_classification_mapping"
+                ]
             except json.JSONDecodeError:
-                st.error(f"CRITICAL ERROR: Taxonomy file {opt} contains invalid JSON.")
+                st.error(f"Taxonomy file {option} contains invalid JSON: {path}")
                 return None
-    return maps
+    return mappings
 
-def calculate_risk_score(row, asset_crit_column, weight_dict):
-  
-    v_severity = (row["CVSS base score"] / 10.0) if pd.notna(row["CVSS base score"]) else 0.0
-    v_exploited = 1.0 if str(row.get("Exploitation context", "")).strip().lower() == "active" else 0.0
-    v_poc, v_patch, v_controls, v_transfer = 0.5, 0.5, 0.3, 0.0
-    v_criticality = (row[asset_crit_column] / 4.0)
-    
-    final_score = (
-        (v_severity * weight_dict.get("severity", 0.0)) +
-        (v_exploited * weight_dict.get("exploited_in_the_wild", 0.0)) +
-        (v_poc * weight_dict.get("poc_exploit_availability", 0.0)) +
-        (v_patch * weight_dict.get("patch_difficulty", 0.0)) +
-        (v_controls * weight_dict.get("compensating_controls", 0.0)) +
-        (v_criticality * weight_dict.get("asset_criticality", 0.0)) +
-        (v_transfer * weight_dict.get("risk_acceptance_transfer", 0.0))
-    ) * 100.0
-    return round(final_score, 2)
+
+def load_scoring_config():
+    if not SCORING_CONFIG_PATH.is_file():
+        st.error(f"Scoring configuration file is missing: {SCORING_CONFIG_PATH}")
+        return None
+    with SCORING_CONFIG_PATH.open(encoding="utf-8") as config_file:
+        try:
+            return json.load(config_file)
+        except json.JSONDecodeError:
+            st.error(
+                f"Scoring configuration contains invalid JSON: {SCORING_CONFIG_PATH}"
+            )
+            return None
+
+
+@st.cache_data(show_spinner=False)
+def load_input_data(path: str, modified_ns: int, size: int) -> pd.DataFrame:
+    return pd.read_excel(path, engine="openpyxl")
+
+
+@st.cache_data(show_spinner=False)
+def cached_score_data(data, weights, mappings, scoring_config, kev_catalog):
+    return score_dataset(data, weights, mappings, scoring_config, kev_catalog)
+
 
 def main():
-
     st.title("Automated Multi-Taxonomy Risk Scoring Engine")
-    st.caption("Version 1.0 (Development)")
-    st.divider()
+    st.caption("Version 2.0")
 
-    # Core background backend operations
-    weights = load_weights()
-    maps = load_taxonomies()
-    
-    if weights is None or maps is None:
+    weight_config = load_weights()
+    taxonomies = load_taxonomies()
+    scoring_config = load_scoring_config()
+    if weight_config is None or taxonomies is None or scoring_config is None:
         st.stop()
 
-    if not os.path.exists(INPUT_EXCEL_PATH):
-        st.error(f"ERROR: Master Excel tracking sheet not found at {INPUT_EXCEL_PATH}")
+    if not INPUT_EXCEL_PATH.is_file():
+        st.error(f"Master input workbook not found: {INPUT_EXCEL_PATH}")
         st.stop()
-        
-    df = pd.read_excel(INPUT_EXCEL_PATH)
-    df["Exposure classification"] = df["Exposure classification"].fillna("internal").astype(str).str.strip().str.lower()
-    
-    # Structural framework mappings
-    df["Asset_Crit_A"] = df["Exposure classification"].map(maps["A"]).fillna(1).astype(int)
-    df["Asset_Crit_B"] = df["Exposure classification"].map(maps["B"]).fillna(1).astype(int)
-    df["Asset_Crit_C"] = df["Exposure classification"].map(maps["C"]).fillna(1).astype(int)
-    
-    # Background algorithmic risk calculations
-    df["Final_Risk_Score_Option_A"] = df.apply(lambda r: calculate_risk_score(r, "Asset_Crit_A", weights), axis=1)
-    df["Final_Risk_Score_Option_B"] = df.apply(lambda r: calculate_risk_score(r, "Asset_Crit_B", weights), axis=1)
-    df["Final_Risk_Score_Option_C"] = df.apply(lambda r: calculate_risk_score(r, "Asset_Crit_C", weights), axis=1)
-    
-    # Default sorting configuration 
-    df_sorted = df.sort_values(by="Final_Risk_Score_Option_B", ascending=False)
-    
+    input_stat = INPUT_EXCEL_PATH.stat()
+    raw_data = load_input_data(
+        str(INPUT_EXCEL_PATH), input_stat.st_mtime_ns, input_stat.st_size
+    )
+    kev_catalog = load_kev(DEFAULT_KEV_PATH)
+    kev_notice = catalog_warning(kev_catalog)
+    if kev_notice:
+        st.warning(kev_notice)
+    elif kev_catalog:
+        st.caption(
+            f"CISA KEV snapshot {kev_catalog.version}, "
+            f"released {kev_catalog.date_released.date()}."
+        )
+
+    data, quality, exposure_a = cached_score_data(
+        raw_data,
+        weight_config["weights"],
+        taxonomies,
+        scoring_config,
+        kev_catalog,
+    )
+    dimension = quality["dimension"]
+    active_option = st.session_state.get("active_taxonomy", "Option B")[-1]
+    exposure_quality = quality["exposure"][active_option]
+    if exposure_quality["blank_count"] or exposure_quality["unmapped_count"]:
+        st.warning(
+            f"Option {active_option} exposure quality: "
+            f"{exposure_quality['blank_count']} blank and "
+            f"{exposure_quality['unmapped_count']} unmapped values. "
+            "Configured defaults were applied and recorded."
+        )
+    if dimension["controls_unmatched_count"]:
+        st.warning(
+            f"{dimension['controls_unmatched_count']} findings have control text "
+            "that matched no configured category."
+        )
+    if dimension["unknown_count"]:
+        st.warning(
+            f"{dimension['unknown_count']} patch-complexity value(s) used the "
+            "configured default."
+        )
+    if quality["severity_mismatches_before"]:
+        st.warning(
+            f"{quality['severity_mismatches_before']} source CVSS severity "
+            "label(s) disagree with the numeric score; recomputed labels are used."
+        )
+    st.caption(
+        f"PoC lookup coverage: {dimension['poc_coverage']}; missing values use "
+        "the configured placeholder. Asset-tier counts and control descriptions "
+        "are synthetic dataset values."
+    )
+
+    asset_comparison = compare_asset_criticality_modes(
+        data,
+        exposure_a,
+        scoring_config["asset_criticality"],
+        weight_config["weights"],
+        scoring_config,
+    )
+    comparison_path = write_asset_criticality_comparison(asset_comparison)
+    st.caption(f"Asset criticality comparison saved to {comparison_path}.")
+
+    band_distribution = build_band_distribution(data, scoring_config)
+    band_output_path = OUTPUT_DIR / "band_distribution.csv"
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    band_distribution.to_csv(band_output_path, index=False)
+    st.caption(
+        f"Risk bands use {scoring_config['risk_bands']['mode']}; distributions "
+        f"for both scales are saved to {band_output_path}."
+    )
+
+    data = data.sort_values("Rank_Option_B", ascending=True)
     st.subheader("Risk Calculation Summary Matrix")
     output_columns = [
-        "CVE ID", 
-        "Exposure classification", 
-        "CVSS base score", 
-        "Final_Risk_Score_Option_A", 
-        "Final_Risk_Score_Option_B", 
-        "Final_Risk_Score_Option_C"
+        "Finding ID",
+        "CVE ID",
+        "Exposure classification",
+        "CVSS base score",
+        "CVSS severity (recomputed)",
+        "Severity_label_mismatch",
+        "Asset_Tier_Score",
+        "Score_Rescaled_Option_A",
+        "Risk_Level_Option_A",
+        "Final_Risk_Score_Option_A",
+        "Rank_Option_A",
+        "Score_Rescaled_Option_B",
+        "Risk_Level_Option_B",
+        "Final_Risk_Score_Option_B",
+        "Rank_Option_B",
+        "Score_Rescaled_Option_C",
+        "Risk_Level_Option_C",
+        "Final_Risk_Score_Option_C",
+        "Rank_Option_C",
     ]
-    st.dataframe(df_sorted[output_columns], use_container_width=True)
-    
-    # Save output spreadsheet
-    try:
-        df_sorted.to_excel(OUTPUT_EXCEL_PATH, index=False)
-        st.success(f"Excel sheet exported successfully to: {OUTPUT_EXCEL_PATH}")
-    except Exception as e:
-        st.error(f"EXPORT ERROR: Failed to save final Excel sheet to disk: {e}")
+    st.dataframe(data[output_columns], width="stretch", hide_index=True)
+
+    if st.button("Export scoring results", type="primary"):
+        run_info = build_run_info(
+            ROOT_DIR,
+            INPUT_EXCEL_PATH,
+            len(raw_data),
+            WEIGHT_CONFIG_PATH,
+            weight_config,
+            SCORING_CONFIG_PATH,
+            scoring_config,
+            TAXONOMY_FILES,
+            kev_catalog,
+        )
+        write_scoring_export(
+            data, quality, kev_catalog, run_info, OUTPUT_EXCEL_PATH
+        )
+        st.success(f"Scoring export created: {OUTPUT_EXCEL_PATH}")
+
+    if OUTPUT_EXCEL_PATH.is_file():
+        st.download_button(
+            "Download latest scoring export",
+            data=OUTPUT_EXCEL_PATH.read_bytes(),
+            file_name=OUTPUT_EXCEL_PATH.name,
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+
 
 if __name__ == "__main__":
     main()

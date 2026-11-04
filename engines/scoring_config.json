@@ -1,0 +1,165 @@
+{
+  "_note_version": "Scoring configuration schema version included in exported run provenance.",
+  "version": "2.0.0",
+  "_note_exposure_default_label": "Label used for blank exposure values. Each such value is counted and reported.",
+  "exposure_default_label": "internal",
+  "_note_exposure_default_score": "Criticality used for unknown nonblank labels. Each such value is counted and reported.",
+  "exposure_default_score": 1,
+  "_note_cvss_severity_thresholds": "CVSS severity bands recomputed from the numeric base score for display and scoring reports.",
+  "cvss_severity_thresholds": {
+    "critical_min": 9.0,
+    "high_min": 7.0,
+    "medium_min": 4.0,
+    "low_min": 0.0
+  },
+  "_note_patch_complexity": "Patch difficulty score mapping and direction; harder_is_higher follows charter wording. Unknown labels are counted and use default_score.",
+  "patch_complexity": {
+    "scale_max": 3,
+    "direction": "harder_is_higher",
+    "scores": {
+      "Low": 1,
+      "Medium": 2,
+      "High": 3,
+      "Very High": 3
+    },
+    "default_score": 2
+  },
+  "_note_compensating_controls": "Matched synthetic control descriptions reduce residual risk. Each category is counted once and the summed category weights are capped.",
+  "compensating_controls": {
+    "scale_max": 3,
+    "max_counted_weight": 3,
+    "categories": {
+      "ips": {
+        "pattern": "\\bIPS\\b",
+        "weight": 1.0,
+        "type": "preventive",
+        "cis_control": "13"
+      },
+      "waf": {
+        "pattern": "\\bWAF\\b",
+        "weight": 1.0,
+        "type": "preventive",
+        "cis_control": "16"
+      },
+      "mfa_sso": {
+        "pattern": "\\bMFA\\b|SSO",
+        "weight": 1.0,
+        "type": "preventive",
+        "cis_control": "6"
+      },
+      "segmentation_access": {
+        "pattern": "segment|isolated|not routable|allow-list|VPN|ACL|restricted|reachable only from|subnet",
+        "weight": 1.0,
+        "type": "preventive",
+        "cis_control": "12"
+      },
+      "hardening": {
+        "pattern": "EDR|hardened|non-root|lockdown|egress|least-privileged|disabled|seccomp|blacklisted|no added capabilities|\\bPAM\\b",
+        "weight": 1.0,
+        "type": "preventive",
+        "cis_control": "4"
+      },
+      "proxy_gateway": {
+        "pattern": "proxy|load balancer",
+        "weight": 1.0,
+        "type": "preventive",
+        "cis_control": "12"
+      },
+      "backup": {
+        "pattern": "backup|snapshot",
+        "weight": 1.0,
+        "type": "recovery",
+        "cis_control": "11"
+      },
+      "monitoring": {
+        "pattern": "SIEM|alert|scanning",
+        "weight": 1.0,
+        "type": "detective",
+        "cis_control": "8"
+      }
+    }
+  },
+  "_note_controls_profile": "Select equal (the default) or effectiveness; the latter applies the documented effectiveness weights to detective and recovery categories.",
+  "controls_profile": "equal",
+  "_note_controls_profile_effectiveness": "Alternative profile: preventive 1.0, detective 0.5, recovery 0.5. This is not the default and does not change charter weights.",
+  "controls_profile_effectiveness": {
+    "preventive": 1.0,
+    "detective": 0.5,
+    "recovery": 0.5
+  },
+  "_note_poc_placeholder_level": "PoC level for CVEs without a manual lookup value. Level is 0-2; normalized score is level divided by 2.",
+  "poc_placeholder_level": 1,
+  "_note_risk_transfer_mode": "Reducer subtracts transfer weight times normalized status from the total; additive is provided as a configurable alternative.",
+  "risk_transfer_mode": "reducer",
+  "_note_risk_transfer_min_score": "Minimum native 0-100 score after transfer reduction.",
+  "risk_transfer_min_score": 0.0,
+  "_note_risk_transfer_status_scale": "Accepted and transferred statuses map to 1 and 2, respectively, on a 0-2 scale.",
+  "risk_transfer_status_scale_max": 2,
+  "_note_asset_criticality": "Option A defaults to charter-defined exposure-only criticality. Tier and blend modes are sensitivity alternatives.",
+  "asset_criticality": {
+    "mode": "exposure_only",
+    "tier_scores": {
+      "Critical assets": 4,
+      "High-criticality assets": 3,
+      "Medium-criticality assets": 2,
+      "Low-criticality assets": 1
+    },
+    "combine": "max"
+  },
+  "_note_score_scale": "Linear conversion from native 0-100 to charter 1-24, rounded to the nearest integer for bands. Unrounded native scores determine ranks.",
+  "score_scale": {
+    "native_min": 0,
+    "native_max": 100,
+    "rescaled_min": 1,
+    "rescaled_max": 24,
+    "rounding": "nearest_integer"
+  },
+  "_note_risk_bands": "Select rescaled_24 (the charter default) or native_100. At shared boundaries, the earlier band in the list wins.",
+  "risk_bands": {
+    "mode": "rescaled_24",
+    "rescaled_24": [
+      {
+        "name": "Low",
+        "min": 1,
+        "max": 6
+      },
+      {
+        "name": "Medium",
+        "min": 7,
+        "max": 12
+      },
+      {
+        "name": "High",
+        "min": 13,
+        "max": 18
+      },
+      {
+        "name": "Critical",
+        "min": 19,
+        "max": 24
+      }
+    ],
+    "native_100": [
+      {
+        "name": "Low",
+        "min": 0,
+        "max": 25
+      },
+      {
+        "name": "Medium",
+        "min": 25,
+        "max": 50
+      },
+      {
+        "name": "High",
+        "min": 50,
+        "max": 75
+      },
+      {
+        "name": "Critical",
+        "min": 75,
+        "max": 100
+      }
+    ]
+  }
+}
