@@ -103,18 +103,15 @@ def load_compiled_model_data():
 def cached_score_data(data, weights, mappings, scoring_config, kev_catalog):
     return score_dataset(data, weights, mappings, scoring_config, kev_catalog)
 
-if "active_taxonomy" not in st.session_state: st.session_state.active_taxonomy = "Option B"
+if st.session_state.get("active_taxonomy") not in {"Option A", "Option B", "Option C"}:
+    st.session_state.active_taxonomy = "Option B"
 
 
 # 5. Main Dashboard Header View Layout
 st.title("SOC Main Dashboard")
 st.subheader("Select Active Taxonomy Perspective")
-btn_none, btn_a, btn_b, btn_c = st.columns(4)
+btn_a, btn_b, btn_c = st.columns(3)
 
-with btn_none:
-    if st.button("None", width="stretch", type="secondary" if st.session_state.active_taxonomy != "None" else "primary"):
-        st.session_state.active_taxonomy = "None"
-        st.rerun()
 with btn_a:
     if st.button("Option A", width="stretch", type="secondary" if st.session_state.active_taxonomy != "Option A" else "primary"):
         st.session_state.active_taxonomy = "Option A"
@@ -191,7 +188,7 @@ if not v_data.empty:
         "for both scales are saved under outputs/."
     )
 
-is_dyn = not v_data.empty and "Exposure classification" in v_data.columns and st.session_state.active_taxonomy != "None"
+is_dyn = not v_data.empty and "Exposure classification" in v_data.columns
 if is_dyn:
     active_opt = st.session_state.active_taxonomy[-1]
     v_data["Normalized Score"] = v_data[
