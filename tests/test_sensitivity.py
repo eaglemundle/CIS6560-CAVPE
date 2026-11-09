@@ -1,8 +1,6 @@
 import hashlib
 import importlib.util
 import json
-import subprocess
-import sys
 from pathlib import Path
 
 import pandas as pd
@@ -39,20 +37,8 @@ def test_sensitivity_run_generates_metrics_movers_and_chart(tmp_path):
     input_hash = file_hash(INPUT_WORKBOOK)
     weight_hash = file_hash(WEIGHT_CONFIG_PATH)
 
-    subprocess.run(
-        [
-            sys.executable,
-            str(SENSITIVITY_SCRIPT),
-            "--input",
-            str(INPUT_WORKBOOK),
-            "--output-dir",
-            str(tmp_path),
-        ],
-        cwd=ROOT,
-        check=True,
-        capture_output=True,
-        text=True,
-    )
+    module = load_sensitivity_module()
+    module.run_sensitivity(INPUT_WORKBOOK, tmp_path)
     summary_path = tmp_path / "sensitivity_summary.csv"
     movers_path = tmp_path / "sensitivity_rank_movers.csv"
     chart_path = tmp_path / "sensitivity_kendall_tau.html"
@@ -67,6 +53,10 @@ def test_sensitivity_run_generates_metrics_movers_and_chart(tmp_path):
         "weight_severity_minus_10pct",
         "rule_patch_direction_harder_is_lower",
     }.issubset(set(summary["Scenario"]))
+    assert not summary["Scenario"].str.contains("option_c|additive", case=False).any()
+    assert not summary["Scenario"].str.contains(
+        "rule_asset_criticality", case=False
+    ).any()
     baseline = summary[summary["Scenario"] == "baseline_option_a"]
     assert baseline["Kendall_tau"].eq(1.0).all()
     assert baseline["Top_n_overlap_count"].eq(30).all()

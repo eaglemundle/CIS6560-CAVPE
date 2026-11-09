@@ -11,7 +11,7 @@ WEIGHTS = {
     "patch_difficulty": 0.1,
     "compensating_controls": 0.15,
     "asset_criticality": 0.1,
-    "risk_acceptance_transfer": 0.05,
+    "risk_transfer": 0.05,
 }
 SCORING_CONFIG = {
     "risk_transfer_mode": "reducer",

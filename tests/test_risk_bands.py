@@ -70,12 +70,12 @@ def test_rank_ties_are_broken_deterministically_without_rounding():
     assert repeated == actual
 
 
-def test_band_columns_and_distribution_cover_all_taxonomies_and_modes():
+def test_band_columns_and_distribution_cover_both_taxonomies_and_modes():
     config = scoring_config()
     data = pd.DataFrame(
         {
             f"Final_Risk_Score_Option_{option}": [0.0, 50.0, 100.0]
-            for option in "ABC"
+            for option in "AB"
         }
     )
 
@@ -84,7 +84,12 @@ def test_band_columns_and_distribution_cover_all_taxonomies_and_modes():
 
     assert result["Score_Rescaled_Option_A"].tolist() == [1, 13, 24]
     assert result["Risk_Level_Option_A"].tolist() == ["Low", "High", "Critical"]
-    assert len(distribution) == 24
+    assert result["Contextual_Priority_Option_A"].tolist() == [
+        "P4 - Low",
+        "P2 - High",
+        "P1 - Urgent",
+    ]
+    assert len(distribution) == 16
     assert distribution.groupby(["Taxonomy", "Score_mode"])["Count"].sum().eq(3).all()
     assert np.isclose(
         distribution.groupby(["Taxonomy", "Score_mode"])["Percent"].sum(),

@@ -1,105 +1,105 @@
-import json, os, datetime
+import datetime
+import json
+import math
+import os
+
 import streamlit as st
 
+
 S_DIR = os.path.dirname(os.path.abspath(__file__))
-# Target deployment path mapped safely into engines directory architecture
 W_CONF = os.path.join(os.path.dirname(S_DIR), "engines", "weight_config.json")
 
-st.title("Risk Weight Tuning Matrix")
-
-# Preset configuration profiles optimized for the requested structural order
-PRESETS = {
-    "Custom Profile": None,
-    "Asset Criticality Model": {
-        "asset_value": 0.25, 
-        "exploit_evidence": 0.10, 
-        "exposure": 0.20, 
-        "compensating_controls": 0.10, 
-        "business_impact": 0.30, 
-        "patch_feasibility": 0.05, 
-        "severity": 0.00
-    },
-    "Patch Complexity Model": {
-        "asset_value": 0.10, 
-        "exploit_evidence": 0.15, 
-        "exposure": 0.10, 
-        "compensating_controls": 0.20, 
-        "business_impact": 0.10, 
-        "patch_feasibility": 0.35, 
-        "severity": 0.00
-    }
+CHARTER_WEIGHTS = {
+    "severity": 0.40,
+    "exploited_in_the_wild": 0.15,
+    "poc_exploit_availability": 0.10,
+    "patch_difficulty": 0.10,
+    "compensating_controls": 0.10,
+    "asset_criticality": 0.10,
+    "risk_transfer": 0.05,
 }
+WEIGHT_LABELS = {
+    "severity": "Severity (CVSS 0-10)",
+    "exploited_in_the_wild": "Exploited in the wild (0-2)",
+    "poc_exploit_availability": "PoC exploit availability (0-2)",
+    "patch_difficulty": "Patch difficulty (1-3)",
+    "compensating_controls": "Compensating controls (0-3; fewer controls score higher)",
+    "asset_criticality": "Asset criticality (1-4; taxonomy-specific)",
+    "risk_transfer": "Risk transfer (0-2; reduces score)",
+}
+PRESETS = {"Charter Default": CHARTER_WEIGHTS, "Custom Profile": None}
 
-# Load current active profile settings from disk
+st.title("Risk Weight Tuning Matrix")
+st.caption("Weights apply to both taxonomy perspectives; risk transfer always reduces risk.")
+
 try:
-    with open(W_CONF, "r", encoding="utf-8") as f:
-        config_data = json.load(f)
-except:
+    with open(W_CONF, "r", encoding="utf-8") as weight_file:
+        config_data = json.load(weight_file)
+except FileNotFoundError:
     config_data = {
-        "taxonomy_name": "CIS6560_Risk_Scoring_Weights_OptionB",
-        "version": "1.3.0",
-        "selected_preset": "Custom Profile",
-        "last_updated": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        "weights": {"asset_value": 0.25, "exploit_evidence": 0.25, "exposure": 0.10, "compensating_controls": 0.15, "business_impact": 0.15, "patch_feasibility": 0.10, "severity": 0.00}
+        "taxonomy_name": "CIS6560_Risk_Scoring_Weights",
+        "version": "2.0.0",
+        "weights": dict(CHARTER_WEIGHTS),
+        "selected_preset": "Charter Default",
     }
+except (OSError, json.JSONDecodeError) as error:
+    st.error(f"Could not load the weight configuration: {error}")
+    st.stop()
 
 weights = config_data.get("weights", {})
-saved_preset_name = config_data.get("selected_preset", "Custom Profile")
+if set(weights) != set(CHARTER_WEIGHTS):
+    st.error(
+        "The saved weights do not match the seven scoring dimensions. "
+        "Restore the charter defaults before tuning."
+    )
+    st.stop()
 
-# Resolve proper dropdown baseline position index mapping
-preset_keys = list(PRESETS.keys())
-try:
-    default_index = preset_keys.index(saved_preset_name)
-except ValueError:
-    default_index = 0
+saved_preset = config_data.get("selected_preset", "Custom Profile")
+selected_preset = st.selectbox(
+    "Select profile:",
+    list(PRESETS),
+    index=list(PRESETS).index(saved_preset)
+    if saved_preset in PRESETS
+    else 1,
+)
 
-selected_preset = st.selectbox("Select Profile Preset:", preset_keys, index=default_index)
+initial_weights = PRESETS[selected_preset] or weights
 updated_weights = {}
+for key, label in WEIGHT_LABELS.items():
+    updated_weights[key] = st.number_input(
+        f"{label} weight",
+        min_value=0.0,
+        max_value=1.0,
+        value=float(initial_weights[key]),
+        step=0.01,
+        format="%.2f",
+        key=f"weight_{selected_preset}_{key}",
+    )
 
-# Exact structural sequence alignment: asset value, exploit evidence, exposure, compensating_controls, business_impact, and patch feasibility.
-target_keys = ["asset_value", "exploit_evidence", "exposure", "compensating_controls", "business_impact", "patch_feasibility", "severity"]
-
-for k in target_keys:
-    # Resolve initial default metrics based on profile selection triggers
-    if PRESETS[selected_preset] is not None:
-        initial_val = float(PRESETS[selected_preset].get(k, 0.0))
-    else:
-        # If toggling back to Custom Profile, fallback to current loaded file parameters
-        initial_val = float(weights.get(k, 0.0))
-        
-    label_name = "severity (CVSS base score)" if k == "severity" else k
-    updated_weights[k] = st.number_input(label=f"{label_name} weight multiplier", min_value=0.0, max_value=1.0, value=initial_val, step=0.01, format="%.2f", key=f"k_{k}_{selected_preset}")
-
-st.markdown("---")
-
-# Compliance check calculation logic
 weights_sum = sum(updated_weights.values())
-
-if round(weights_sum, 2) == 1.00:
-    st.success(f"Governance Compliant: Weight sum equals {weights_sum:.2f}")
+st.metric("Current weight total", f"{weights_sum:.2f}")
+if math.isclose(weights_sum, 1.0, rel_tol=0.0, abs_tol=1e-9):
+    st.success(f"Governance compliant: weights sum to {weights_sum:.2f}.")
     if st.button("Save Weight Configurations", use_container_width=True):
-        # Update both parameters block, chosen model string tracker, and root serialization timetrace data safely
         config_data["selected_preset"] = selected_preset
-        config_data["last_updated"] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        config_data["last_updated"] = datetime.datetime.now().strftime(
+            "%Y-%m-%d %H:%M:%S"
+        )
         config_data["weights"] = updated_weights
-        
-        os.makedirs(os.path.dirname(W_CONF), exist_ok=True)
-        with open(W_CONF, "w", encoding="utf-8") as f:
-            json.dump(config_data, f, indent=4, ensure_ascii=False)
-        st.success("Configuration successfully deployed.")
-        st.rerun()
+        try:
+            with open(W_CONF, "w", encoding="utf-8") as weight_file:
+                json.dump(config_data, weight_file, indent=2)
+        except OSError as error:
+            st.error(f"Could not save the weight configuration: {error}")
+        else:
+            st.success("Configuration successfully deployed.")
+            st.rerun()
 else:
-    st.error(f"Non-Compliant Grid Matrix: Total weight must equal 1.00 (Current: {weights_sum:.2f})")
+    st.error(
+        "Weights must sum to 1.00 before they can be saved. "
+        f"Current total: {weights_sum:.2f}; adjust the displayed values to proceed."
+    )
 
-# --- Production Deployment Real-Time File Blueprint Inspector ---
 st.markdown("---")
-st.subheader("Saved JSON File Configuration Snapshot View")
-if os.path.exists(W_CONF):
-    try:
-        with open(W_CONF, "r", encoding="utf-8") as f:
-            current_file_state = json.load(f)
-        st.json(current_file_state)
-    except:
-        st.info("System baseline file currently active in transient memory state.")
-else:
-    st.info("System baseline file currently active in transient memory state.")
+st.subheader("Saved JSON File Configuration")
+st.json(config_data)

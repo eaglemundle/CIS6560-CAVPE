@@ -115,7 +115,7 @@ def test_current_dataset_has_no_silent_exposure_fallbacks():
     )
     config = scoring_config()
 
-    for option in "ABC":
+    for option in "AB":
         taxonomy = json.loads(
             (ROOT / "engines" / f"taxonomy_option_{option.lower()}.json").read_text(
                 encoding="utf-8"
