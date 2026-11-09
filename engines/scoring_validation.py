@@ -20,6 +20,14 @@ def map_exposure_classification(
     normalized_mapping = {
         str(label).strip().lower(): score for label, score in exposure_mapping.items()
     }
+    if any(
+        isinstance(score, bool)
+        or not isinstance(score, (int, float))
+        or not float(score).is_integer()
+        or not 1 <= int(score) <= 4
+        for score in normalized_mapping.values()
+    ):
+        raise ValueError("Exposure mappings must use integer scores from 1 through 4")
     if default_label not in normalized_mapping:
         raise ValueError(
             f"exposure_default_label {default_label!r} is not in the taxonomy mapping"
