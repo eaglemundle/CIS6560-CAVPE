@@ -2,48 +2,66 @@ import streamlit as st
 import os
 from datetime import datetime
 
-# Global Streamlit Page Configuration (Must be called at the very top)
 st.set_page_config(
     page_title="Context-Aware Vulnerability Prioritization Engine",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# Function to render the central version selector dashboard (app.py main content)
+# Sidebar HTML Injection for Last Modified
+file_path = __file__
+if os.path.exists(file_path):
+    mtime = os.path.getmtime(file_path)
+    last_modified_date = datetime.fromtimestamp(mtime).strftime('%Y-%m-%d %H:%M:%S')
+    
+    st.markdown(
+        f"""
+        <style>
+            [data-testid="stSidebarNav"]::before {{
+                content: "Last Modified: {last_modified_date}";
+                display: block;
+                padding: 1rem 1rem 0.5rem 1rem;
+                font-size: 0.8rem;
+                color: var(--text-color);
+                font-weight: bold;
+                opacity: 0.7;
+                border-bottom: 1px solid rgba(49, 51, 63, 0.2);
+                margin-bottom: 1rem;
+            }}
+        </style>
+        """,
+        unsafe_allow_html=True
+    )
+
 def render_home_page():
     st.title("Context-Aware Vulnerability Prioritization Engine")
     
     col1, col2, col3, col4 = st.columns(4)
     
-    # Column 1: Legacy Version 0.0
     with col1:
         st.subheader("Version 0.0")
         st.caption("for Streamlit testing")
         if st.button("Run Version 0.0", key="go_v0", use_container_width=True):
             st.switch_page("Legacy_Dashboard.py")
             
-    # Column 2: Old Version 1.0
     with col2:
         st.subheader("Old Version 1.0")
         st.caption("Before Nov 2")
         if st.button("Run Old V1.0", key="go_v1_old", use_container_width=True):
             st.switch_page("pages/01_SOC_Main.py")
             
-    # Column 3: Active Development Version 1.0
     with col3:
         st.subheader("Version 1.0")
         st.caption("Active Development")
         if st.button("Run Dev V1.7", key="go_v1_dev", type="primary", use_container_width=True):
             st.switch_page("pages/01_v1_dashboard.py")
             
-    # Column 4: Version 2.0 (New)
     with col4:
         st.subheader("Version 2.0")
         st.caption("Latest Stable Version")
         if st.button("Run Version 2.0", key="go_v2", type="primary", use_container_width=True):
             st.switch_page("pages/01_v2_dashboard.py")
 
-    # Lower Section: Calendar & Project Documentation
     st.markdown("<br>", unsafe_allow_html=True)
     st.divider()
     st.subheader("Calendar & Project Documentation")
@@ -70,41 +88,33 @@ def render_home_page():
         else:
             st.error("File missing: doc/project_charter.pdf")
 
-# 1. Map the entrypoint file to a formal st.Page object
+# Define explicitly to avoid duplicate page objects
 home_page = st.Page(render_home_page, title="Home Selector")
+calendar_page = st.Page("cavpe_calendar.py", title="Calendar")
+legacy_page = st.Page("Legacy_Dashboard.py", title="Legacy Dashboard")
 
-# 2. Dynamically scan and list all Python files inside the 'pages/' directory
+# Scan pages/ directory
 pages_dir = "pages"
-dynamic_pages = []
+dynamic_pages_objects = []
 
 if os.path.exists(pages_dir):
-    # Sort files alphabetically to respect the numeric prefixes (01_, 02_, etc.)
     sorted_files = sorted(os.listdir(pages_dir))
     for filename in sorted_files:
         if filename.endswith(".py"):
             full_path = os.path.join(pages_dir, filename).replace("\\", "/")
-            dynamic_pages.append(full_path)
+            # Generate st.Page object instead of raw strings to handle complex layouts smoothly
+            clean_title = filename.replace(".py", "").replace("_", " ")
+            dynamic_pages_objects.append(st.Page(full_path, title=clean_title))
 
-# 3. Configure Navigation Menu by passing the full list of generated paths
+# Combined dictionary structure
 pages_dict = {
-    "Main Menu": [
-        home_page, 
-        "cavpe_calendar.py",
-        "Legacy_Dashboard.py"
-    ],
-    "Pages Directory": dynamic_pages
+    "Main Menu": [home_page, calendar_page, legacy_page],
+    "Pages Directory": dynamic_pages_objects
 }
 
-# 4. Render the comprehensive multi-page navigation framework on the sidebar
+# Single call to st.navigation with default structural behavior
+# Setting expanded=True keeps sections open, while we leverage strict object routing
 pg = st.navigation(pages_dict, position="sidebar", expanded=True)
 
-# Display file modification metadata in the sidebar
-file_path = __file__
-if os.path.exists(file_path):
-    mtime = os.path.getmtime(file_path)
-    last_modified_date = datetime.fromtimestamp(mtime).strftime('%Y-%m-%d %H:%M:%S')
-    st.sidebar.caption(f"**Last Modified:** {last_modified_date}")
-st.sidebar.divider()
-
-# 5. Run the Streamlit Navigation Router
+# Run router pipeline
 pg.run()
