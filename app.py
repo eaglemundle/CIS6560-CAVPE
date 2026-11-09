@@ -55,7 +55,7 @@ def render_home_page():
         st.subheader("Version 1.0")
         st.caption("Active Development")
         if st.button("Run Dev V1.7", key="go_v1_dev", type="primary", use_container_width=True):
-            st.switch_page("pages/01_v1_dashboard.py")
+            st.switch_page("pages/00_v1_dashboard.py")
             
     with col4:
         st.subheader("Version 2.0")
