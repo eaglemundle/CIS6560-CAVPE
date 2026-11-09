@@ -12,7 +12,7 @@
     "medium_min": 4.0,
     "low_min": 0.0
   },
-  "_note_patch_complexity": "Patch difficulty score mapping and direction; harder_is_higher follows charter wording. Unknown labels are counted and use default_score.",
+  "_note_patch_complexity": "Patch difficulty uses the charter's 1-3 score divided by 3. The 1/3 minimum is an intentional baseline contribution. harder_is_higher follows charter wording. Unknown labels are counted and use default_score.",
   "patch_complexity": {
     "scale_max": 3,
     "direction": "harder_is_higher",
@@ -89,13 +89,13 @@
   },
   "_note_poc_placeholder_level": "PoC level for CVEs without a manual lookup value. Level is 0-2; normalized score is level divided by 2.",
   "poc_placeholder_level": 1,
-  "_note_risk_transfer_mode": "Reducer subtracts transfer weight times normalized status from the total; additive is provided as a configurable alternative.",
+  "_note_risk_transfer_mode": "Risk transfer always reduces the total by its weight times normalized status; additive scoring is not supported.",
   "risk_transfer_mode": "reducer",
   "_note_risk_transfer_min_score": "Minimum native 0-100 score after transfer reduction.",
   "risk_transfer_min_score": 0.0,
   "_note_risk_transfer_status_scale": "Accepted and transferred statuses map to 1 and 2, respectively, on a 0-2 scale.",
   "risk_transfer_status_scale_max": 2,
-  "_note_asset_criticality": "Option A defaults to charter-defined exposure-only criticality. Tier and blend modes are sensitivity alternatives.",
+  "_note_asset_criticality": "Options A and B always use their charter exposure mappings as asset criticality. Criticality uses the charter's 1-4 value divided by 4, so the 1/4 minimum is an intentional baseline contribution. Tier and blend modes are separate comparison-report alternatives, not scoring options.",
   "asset_criticality": {
     "mode": "exposure_only",
     "tier_scores": {

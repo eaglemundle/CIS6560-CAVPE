@@ -7,6 +7,9 @@ import pandas as pd
 from engines.kev_validation import KevCatalog, cve_level_kev_summary
 
 
+TAXONOMY_OPTIONS = ("A", "B")
+
+
 def build_data_quality_report(
     data: pd.DataFrame, quality: dict, catalog: KevCatalog | None
 ) -> pd.DataFrame:
@@ -14,7 +17,8 @@ def build_data_quality_report(
     report["Record_type"] = "CVE"
     dimension = quality["dimension"]
     metric_rows = []
-    for option, counts in quality["exposure"].items():
+    for option in TAXONOMY_OPTIONS:
+        counts = quality["exposure"][option]
         metric_rows.extend(
             [
                 {
@@ -96,6 +100,21 @@ def write_scoring_export(
     run_info: pd.DataFrame,
     output_path: str | Path,
 ) -> Path:
+    unsupported_columns = [
+        column
+        for column in data.columns
+        if column == "Asset_Crit_C"
+        or str(column).endswith("_Option_C")
+        or "Option C" in str(column)
+    ]
+    if unsupported_columns:
+        raise ValueError(
+            "Scoring exports support only Options A and B; unsupported columns: "
+            + ", ".join(map(str, unsupported_columns))
+        )
+    if "C" in quality["exposure"]:
+        raise ValueError("Scoring export quality data must contain only Options A and B")
+
     path = Path(output_path)
     path.parent.mkdir(parents=True, exist_ok=True)
     kev_review = data[

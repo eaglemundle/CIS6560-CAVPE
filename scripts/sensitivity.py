@@ -30,7 +30,7 @@ WEIGHT_CONFIG_PATH = ROOT_DIR / "engines" / "weight_config.json"
 SCORING_CONFIG_PATH = ROOT_DIR / "engines" / "scoring_config.json"
 TAXONOMY_PATHS = {
     option: ROOT_DIR / "engines" / f"taxonomy_option_{option.lower()}.json"
-    for option in "ABC"
+    for option in "AB"
 }
 OUTPUT_DIR = ROOT_DIR / "outputs"
 WEIGHT_FACTORS = (0.9, 1.1)
@@ -114,7 +114,7 @@ def _build_scenarios(
                 )
             )
 
-    for option in "ABC":
+    for option in "AB":
         scenarios.append(
             (
                 f"taxonomy_option_{option.lower()}",
@@ -129,16 +129,6 @@ def _build_scenarios(
 
     rule_variants = [
         (
-            "rule_asset_criticality_tier_only",
-            "Asset criticality mode set to tier_only.",
-            lambda config: config["asset_criticality"].update(mode="tier_only"),
-        ),
-        (
-            "rule_asset_criticality_blend",
-            "Asset criticality mode set to blend.",
-            lambda config: config["asset_criticality"].update(mode="blend"),
-        ),
-        (
             "rule_patch_direction_harder_is_lower",
             "Patch complexity direction set to harder_is_lower.",
             lambda config: config["patch_complexity"].update(
@@ -149,11 +139,6 @@ def _build_scenarios(
             "rule_controls_profile_effectiveness",
             "Controls profile set to effectiveness.",
             lambda config: config.update(controls_profile="effectiveness"),
-        ),
-        (
-            "rule_risk_transfer_mode_additive",
-            "Risk transfer mode set to additive.",
-            lambda config: config.update(risk_transfer_mode="additive"),
         ),
     ]
     for level in (0, 2):
@@ -313,10 +298,6 @@ def run_sensitivity(
     summary_records: list[dict[str, Any]] = []
     mover_frames: list[pd.DataFrame] = []
     for name, scenario_type, option, scenario_data, scores, note in scenario_results:
-        if name == "rule_risk_transfer_mode_additive" and not baseline_quality[
-            "dimension"
-        ]["risk_register_covered_findings"]:
-            note += " No risk-register findings are present, so this rule has no effect."
         if name.startswith("rule_poc_placeholder_level_"):
             coverage = baseline_quality["dimension"]["poc_coverage"]
             if not coverage:

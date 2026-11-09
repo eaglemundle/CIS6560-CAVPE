@@ -76,6 +76,17 @@ def test_control_patterns_and_legacy_string_categories_are_supported():
     ) == 1
 
 
+def test_fewer_compensating_controls_produce_a_higher_normalized_score():
+    controls_config = scoring_config()["compensating_controls"]
+
+    no_controls = score_controls(None, controls_config)
+    one_control = score_controls("WAF protects the service", controls_config)
+
+    assert no_controls == 3
+    assert one_control == 2
+    assert no_controls / controls_config["scale_max"] > one_control / controls_config["scale_max"]
+
+
 def test_controls_profile_effectiveness_changes_only_detective_or_recovery_types():
     config = scoring_config()
     controls_config = config["compensating_controls"]
@@ -208,7 +219,8 @@ def test_risk_transfer_is_a_reducer_and_respects_the_floor():
     floor_config = {**config, "risk_transfer_min_score": 90.0}
     assert calculate_risk_score(row, "Asset_Crit_A", weights, floor_config) == 90.0
     additive_config = {**config, "risk_transfer_mode": "additive"}
-    assert calculate_risk_score(row, "Asset_Crit_A", weights, additive_config) == 95.0
+    with pytest.raises(ValueError, match="Unsupported risk transfer mode"):
+        calculate_risk_score(row, "Asset_Crit_A", weights, additive_config)
 
 
 def test_integrated_option_a_scores_match_phase4_snapshot():

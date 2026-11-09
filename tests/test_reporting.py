@@ -1,4 +1,5 @@
 import pandas as pd
+import pytest
 
 from engines.reporting import write_scoring_export
 
@@ -12,6 +13,8 @@ def test_scoring_export_has_all_report_worksheets(tmp_path):
                 "Exploitation context": "active",
                 "KEV_status": "flagged in dataset, not in KEV",
                 "Severity_label_mismatch": False,
+                "Final_Risk_Score_Option_A": 42.0,
+                "Final_Risk_Score_Option_B": 39.5,
             }
         ]
     )
@@ -24,7 +27,7 @@ def test_scoring_export_has_all_report_worksheets(tmp_path):
                 "unmapped_labels": [],
                 "unmapped_finding_ids": [],
             }
-            for option in "ABC"
+            for option in "AB"
         },
         "dimension": {
             "unknown_count": 0,
@@ -54,3 +57,14 @@ def test_scoring_export_has_all_report_worksheets(tmp_path):
     assert pd.read_excel(output, sheet_name="Scores")["Finding ID"].tolist() == [
         "VULN-1"
     ]
+    exported_columns = pd.read_excel(output, sheet_name="Scores").columns
+    assert "Final_Risk_Score_Option_A" in exported_columns
+    assert "Final_Risk_Score_Option_B" in exported_columns
+    assert not any("Option_C" in str(column) for column in exported_columns)
+    assert not any("Option C" in sheet for sheet in pd.ExcelFile(output).sheet_names)
+
+    with_option_c = data.assign(Final_Risk_Score_Option_C=1.0)
+    with pytest.raises(ValueError, match="support only Options A and B"):
+        write_scoring_export(
+            with_option_c, quality, None, run_info, tmp_path / "unsupported.xlsx"
+        )
