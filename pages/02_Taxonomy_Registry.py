@@ -27,19 +27,12 @@ if raw_data is not None:
     # Extract keys or lists safely
     opts = []
     if isinstance(raw_data, dict):
-        # Look for list variables first
-        for val in raw_data.values():
-            if isinstance(val, list) and len(val) == 3:
-                opts = val
-                break
-        # Fallback to direct top level keys if no explicit 3-element list is nested
-        if not opts:
-            opts = list(raw_data.keys())
+        opts = raw_data.get("registered_taxonomies", [])
     elif isinstance(raw_data, list):
         opts = raw_data
         
     c1, c2 = st.columns(2)
-    c1.metric(label="Total Registry Options Count", value=len(opts))
+    c1.metric(label="Registered Taxonomies", value=len(opts))
     c2.metric(label="Data Layout Strategy", value="Dictionary Object" if isinstance(raw_data, dict) else "Flat List Array")
         
     st.markdown("---")

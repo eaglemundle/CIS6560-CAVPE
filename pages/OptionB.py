@@ -6,7 +6,7 @@ import pandas as pd
 import numpy as np
 
 # --- 1. Dynamic File Path Definitions ---
-CONFIG_WEIGHTS_PATH = "engines/weight_config.json"
+CONFIG_WEIGHTS_PATH = "weight_config.json"
 CONFIG_OPTION_B_PATH = "engines/taxonomy_option_b.json"
 
 CISA_KEV_CSV = "reference_data/known_exploited_vulnerabilities.csv"

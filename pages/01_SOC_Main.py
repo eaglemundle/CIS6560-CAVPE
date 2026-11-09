@@ -46,7 +46,10 @@ P_DIR = os.path.dirname(S_DIR)
 # Synced path to look inside the 'engines' subfolder for absolute consistency
 W_CONF = os.path.join(P_DIR, "engines", "weight_config.json")
 S_CONF = os.path.join(P_DIR, "engines", "scoring_config.json")
-TAX_FILES = {k: os.path.join(P_DIR, "engines", f"taxonomy_option_{k.lower()}.json") for k in ["A", "B", "C"]}
+TAX_FILES = {
+    key: os.path.join(P_DIR, "engines", f"taxonomy_option_{key.lower()}.json")
+    for key in ("A", "B")
+}
 OUTPUT_EXCEL_PATH = os.path.join(P_DIR, "outputs", "multi_taxonomy_weighted_risk_model.xlsx")
 
 # 3. Mathematical Risk Engine
@@ -89,28 +92,18 @@ def load_data():
     scored_data = df[df["Finding ID"].astype(str).str.startswith("VULN-", na=False)].head(300)
     return scored_data, tgt, input_rows
 
-# Load compiled model from scoring.py if available
-def load_compiled_model_data():
-    if os.path.exists(OUTPUT_EXCEL_PATH):
-        try:
-            return pd.read_excel(OUTPUT_EXCEL_PATH, engine="openpyxl")
-        except (OSError, ValueError, KeyError) as error:
-            st.error(f"Could not read the latest scoring export: {error}")
-            return None
-    return None
-
 @st.cache_data(show_spinner=False)
 def cached_score_data(data, weights, mappings, scoring_config, kev_catalog):
     return score_dataset(data, weights, mappings, scoring_config, kev_catalog)
 
-if st.session_state.get("active_taxonomy") not in {"Option A", "Option B", "Option C"}:
+if st.session_state.get("active_taxonomy") not in {"Option A", "Option B"}:
     st.session_state.active_taxonomy = "Option B"
 
 
 # 5. Main Dashboard Header View Layout
 st.title("SOC Main Dashboard")
 st.subheader("Select Active Taxonomy Perspective")
-btn_a, btn_b, btn_c = st.columns(3)
+btn_a, btn_b = st.columns(2)
 
 with btn_a:
     if st.button("Option A", width="stretch", type="secondary" if st.session_state.active_taxonomy != "Option A" else "primary"):
@@ -119,10 +112,6 @@ with btn_a:
 with btn_b:
     if st.button("Option B", width="stretch", type="secondary" if st.session_state.active_taxonomy != "Option B" else "primary"):
         st.session_state.active_taxonomy = "Option B"
-        st.rerun()
-with btn_c:
-    if st.button("Option C", width="stretch", type="secondary" if st.session_state.active_taxonomy != "Option C" else "primary"):
-        st.session_state.active_taxonomy = "Option C"
         st.rerun()
 
 st.markdown("---")
@@ -145,7 +134,7 @@ if not v_data.empty:
         weight_config = json.load(weight_file)
     weight_dict = weight_config["weights"]
     taxonomy_mappings = {
-        option: get_matrix_config(option)[1] for option in "ABC"
+        option: get_matrix_config(option)[1] for option in "AB"
     }
     v_data, scoring_quality, option_a_exposure = cached_score_data(
         v_data, weight_dict, taxonomy_mappings, scoring_config, kev_catalog
@@ -193,6 +182,9 @@ if is_dyn:
     active_opt = st.session_state.active_taxonomy[-1]
     v_data["Normalized Score"] = v_data[
         f"Unrounded_Risk_Score_Option_{active_opt}"
+    ]
+    v_data["Contextual priority"] = v_data[
+        f"Contextual_Priority_Option_{active_opt}"
     ]
     active_quality = exposure_quality[active_opt]
     if active_quality["blank_count"] or active_quality["unmapped_count"]:
@@ -267,9 +259,9 @@ with col2:
     else:
         st.warning("No exposure classification data.")
 
-# Column 3: Contextual Priority (Raw Clumn Value - Recalculate!!!)
+# Column 3: Contextual Priority derived from the active option's risk band.
 with col3:
-    if tot > 0 and 'Contextual priority' in v_data.columns:
+    if tot > 0 and "Contextual priority" in v_data.columns:
         p_counts = v_data['Contextual priority'].value_counts().reset_index(name="Count")
         p_counts.columns = ['Priority', 'Count']
         
@@ -282,21 +274,13 @@ with col3:
 # 4. Actionable Mitigation Directives (Top 5 Prioritized per Top 5 Affected Asset Groups)
 st.markdown("### **Actionable Mitigation Directives (Top 5 Prioritized for Top 5 Affected Asset Groups):**")
 
-compiled_df = load_compiled_model_data()
-
-# 1. Determine active sorting column based on active taxonomy view
+# Use the currently scored active-option result, never a stale workbook.
 if is_dyn:
-    if st.session_state.active_taxonomy == "Option A":
-        model_sort_col = "Final_Risk_Score_Option_A"
-    elif st.session_state.active_taxonomy == "Option C":
-        model_sort_col = "Final_Risk_Score_Option_C"
-    else:
-        model_sort_col = "Final_Risk_Score_Option_B"
+    model_sort_col = f"Final_Risk_Score_Option_{active_opt}"
 else:
     model_sort_col = "CVSS base score"
 
-# 2. Select data source (compiled model file takes precedence over memory cache)
-source_df = compiled_df if (compiled_df is not None and not compiled_df.empty and model_sort_col in compiled_df.columns) else v_data
+source_df = v_data
 
 if not source_df.empty and "Asset group" in source_df.columns:
     # 3. Find the top 5 asset groups based on total detection count (affected assets count)

@@ -28,7 +28,7 @@ WEIGHT_CONFIG_PATH = ENGINE_DIR / "weight_config.json"
 SCORING_CONFIG_PATH = ENGINE_DIR / "scoring_config.json"
 TAXONOMY_FILES = {
     option: ENGINE_DIR / f"taxonomy_option_{option.lower()}.json"
-    for option in "ABC"
+    for option in "AB"
 }
 INPUT_EXCEL_PATH = (
     ROOT_DIR
@@ -95,6 +95,7 @@ def cached_score_data(data, weights, mappings, scoring_config, kev_catalog):
 def main():
     st.title("Automated Multi-Taxonomy Risk Scoring Engine")
     st.caption("Version 2.0")
+    st.caption("Compare the exposure-centric Option A and business-impact-centric Option B.")
 
     weight_config = load_weights()
     taxonomies = load_taxonomies()
@@ -127,7 +128,10 @@ def main():
         kev_catalog,
     )
     dimension = quality["dimension"]
-    active_option = st.session_state.get("active_taxonomy", "Option B")[-1]
+    active_taxonomy = st.session_state.get("active_taxonomy", "Option B")
+    if active_taxonomy not in {"Option A", "Option B"}:
+        active_taxonomy = "Option B"
+    active_option = active_taxonomy[-1]
     exposure_quality = quality["exposure"][active_option]
     if exposure_quality["blank_count"] or exposure_quality["unmapped_count"]:
         st.warning(
@@ -194,10 +198,6 @@ def main():
         "Risk_Level_Option_B",
         "Final_Risk_Score_Option_B",
         "Rank_Option_B",
-        "Score_Rescaled_Option_C",
-        "Risk_Level_Option_C",
-        "Final_Risk_Score_Option_C",
-        "Rank_Option_C",
     ]
     st.dataframe(data[output_columns], width="stretch", hide_index=True)
 

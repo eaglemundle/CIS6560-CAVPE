@@ -1,5 +1,27 @@
 # Changelog
 
+## Two-option charter alignment
+
+- Corrected the active engine's weight keys to the seven charter dimensions;
+  scoring now rejects missing or unknown keys and weights that do not total 1.0.
+- Removed Option C from the taxonomy registry, scoring pipeline, dashboard,
+  sensitivity analysis, and scoring exports.
+- Kept Option B as the default. Options A and B differ only in their
+  exposure-to-criticality mappings and are scored from independent data copies.
+- Derived P1-P4 contextual-priority labels and the priority chart from the
+  active option's risk band. Risk transfer is enforced as a reducer.
+- Documented the intentional 1/3 patch and 1/4 asset-criticality normalized
+  floors that follow the charter's 1-3 and 1-4 scales divided by their maxima.
+- On the 300-finding sample, Option A scores span 40.1667-90.0000 and Option B
+  41.2000-89.2000. Rescaled bands are A: 0/6/193/101 and B: 0/8/202/90
+  (Low/Medium/High/Critical). Priority counts are A: 0/6/193/101 and
+  B: 0/8/202/90 (P4/P3/P2/P1).
+- The before-fix input priority counts were P1/P2/P3/P4: 114/134/49/3;
+  after-fix active-option counts are A: 101/193/6/0 and B: 90/202/8/0.
+  The top-20 lists now differ by option; Kendall's tau is 0.714560 for A vs B,
+  0.388004 for A vs CVSS-only, and 0.375028 for B vs CVSS-only. The maximum
+  observed A/B score shift is 7.5 points, matching the charter bound.
+
 ## Phase 1 - Baseline and safety net
 
 - Corrected the handoff paths to match this repository: the current scoring
@@ -70,8 +92,7 @@
 - Added optional manual PoC and risk-register CSV readers. With neither file
   present, the configured PoC placeholder remains 0.5 normalized (0 of 207 CVEs
   have lookup coverage) and risk transfer has no effect (0 covered findings).
-  Risk transfer defaults to the configured reducer, supports additive as an
-  alternative, and honors the configured minimum score.
+  Risk transfer uses the reducer and honors the configured minimum score.
 - Both the SOC dashboard and scoring viewer now call the shared scorer. No
   charter weights or taxonomy exposure mappings changed.
 - Repository divergence: the actual v1.0 scorer had constant patch and control
@@ -104,13 +125,12 @@
   default is the charter's 1-24 scale and 1-6/7-12/13-18/19-24 bands; the
   0-100 alternative remains available. Rescaled display values are rounded to
   the nearest integer, while native unrounded scores drive ranks.
-- Added `Score_Rescaled_Option_A/B/C`, `Risk_Level_Option_A/B/C`, and unique
+- Added `Score_Rescaled_Option_A/B`, `Risk_Level_Option_A/B`, and unique
   ranks using score descending, exploited score descending, CVSS descending,
-  then Finding ID ascending. Exported `outputs/band_distribution.csv` for all
-  three options under both scale modes.
-- Current rescaled band counts (Low/Medium/High/Critical): Option A 0/6/193/101,
-  Option B 0/8/202/90, Option C 0/5/186/109. Native-scale counts: A
-  0/7/174/119, B 0/9/180/111, C 0/6/171/123. Each mode totals 300 findings.
+  then Finding ID ascending. Exported `outputs/band_distribution.csv` for both
+  options under both scale modes.
+- Current rescaled band counts (Low/Medium/High/Critical) are A 0/6/193/101
+  and B 0/8/202/90. Native-scale counts are recorded in the generated report.
 
 ## Phase 7 - Reproducible scoring pipeline and exports
 
@@ -137,8 +157,8 @@
 
 - Added the standalone, non-Streamlit command `python scripts/sensitivity.py`.
   It runs the configured Option A baseline, ±10% one-at-a-time weight sweeps
-  (other weights are proportionally rescaled to preserve the total), all three
-  taxonomy options, asset/patch/control/risk-transfer/PoC rule alternatives,
+  (other weights are proportionally rescaled to preserve the total), both
+  taxonomy options, patch/control/PoC rule alternatives,
   and a CVSS-only 0-100 benchmark.
 - Compares each scenario with the current Option A baseline at both finding
   level and CVE level. CVE scores use the highest finding score per CVE.
@@ -146,8 +166,9 @@
   per-finding/per-CVE rank movers.
 - One command regenerates `outputs/sensitivity_summary.csv`,
   `outputs/sensitivity_rank_movers.csv`, and the interactive
-  `outputs/sensitivity_kendall_tau.html` chart. The current run contains 26
-  scenarios, 52 summary rows, and 6,731 finding/CVE rank-mover rows.
+  `outputs/sensitivity_kendall_tau.html` chart. The charter-aligned two-option
+  run contains 22 scenarios, 44 summary rows, and 5,272 finding/CVE rank-mover
+  rows.
 - Added tests for the one-command CLI, both reporting levels, weight-total
   preservation, and unchanged input/config files. No charter weights,
   taxonomy mappings, or input workbook values were modified.

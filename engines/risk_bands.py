@@ -6,6 +6,14 @@ from typing import Any
 import pandas as pd
 
 
+CONTEXTUAL_PRIORITY_LABELS = {
+    "Critical": "P1 - Urgent",
+    "High": "P2 - High",
+    "Medium": "P3 - Planned",
+    "Low": "P4 - Low",
+}
+
+
 def rescale_score(score: float, scale_config: dict[str, float]) -> float:
     native_min = float(scale_config["native_min"])
     native_max = float(scale_config["native_max"])
@@ -38,7 +46,7 @@ def add_risk_band_columns(
     if mode not in {"rescaled_24", "native_100"}:
         raise ValueError(f"Unsupported risk band mode: {mode}")
 
-    for option in "ABC":
+    for option in "AB":
         score_column = f"Final_Risk_Score_Option_{option}"
         raw_column = f"Unrounded_Risk_Score_Option_{option}"
         score_values = result[raw_column] if raw_column in result else result[score_column]
@@ -54,6 +62,9 @@ def add_risk_band_columns(
                 score, scoring_config["risk_bands"][mode]
             )
         )
+        result[f"Contextual_Priority_Option_{option}"] = result[
+            f"Risk_Level_Option_{option}"
+        ].map(CONTEXTUAL_PRIORITY_LABELS)
     return result
 
 
@@ -61,7 +72,7 @@ def build_band_distribution(
     data: pd.DataFrame, scoring_config: dict[str, Any]
 ) -> pd.DataFrame:
     records = []
-    for option in "ABC":
+    for option in "AB":
         score_column = f"Unrounded_Risk_Score_Option_{option}"
         if score_column not in data:
             score_column = f"Final_Risk_Score_Option_{option}"
