@@ -2,13 +2,14 @@ import streamlit as st
 import os
 from datetime import datetime
 
+# 1. Global Page Config (Must be the absolute first Streamlit command)
 st.set_page_config(
     page_title="Context-Aware Vulnerability Prioritization Engine",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# Sidebar HTML Injection for Last Modified
+# 2. Sidebar HTML Injection for Last Modified Metadata
 file_path = __file__
 if os.path.exists(file_path):
     mtime = os.path.getmtime(file_path)
@@ -33,11 +34,11 @@ if os.path.exists(file_path):
         unsafe_allow_html=True
     )
 
+# 3. Main Dashboard Renderer
 def render_home_page():
     st.title("Context-Aware Vulnerability Prioritization Engine")
     
     col1, col2, col3, col4 = st.columns(4)
-    
     with col1:
         st.subheader("Version 0.0")
         st.caption("for Streamlit testing")
@@ -88,33 +89,26 @@ def render_home_page():
         else:
             st.error("File missing: doc/project_charter.pdf")
 
-# Define explicitly to avoid duplicate page objects
+# 4. Explicitly Setup Page Objects
 home_page = st.Page(render_home_page, title="Home Selector")
-calendar_page = st.Page("cavpe_calendar.py", title="Calendar")
-legacy_page = st.Page("Legacy_Dashboard.py", title="Legacy Dashboard")
 
-# Scan pages/ directory
+# 5. Dynamically Collect Pages with Safety Validation
 pages_dir = "pages"
-dynamic_pages_objects = []
+dynamic_pages = []
 
 if os.path.exists(pages_dir):
     sorted_files = sorted(os.listdir(pages_dir))
     for filename in sorted_files:
         if filename.endswith(".py"):
             full_path = os.path.join(pages_dir, filename).replace("\\", "/")
-            # Generate st.Page object instead of raw strings to handle complex layouts smoothly
-            clean_title = filename.replace(".py", "").replace("_", " ")
-            dynamic_pages_objects.append(st.Page(full_path, title=clean_title))
+            dynamic_pages.append(full_path)
 
-# Combined dictionary structure
+# 6. Construct Strict Framework Data Structure
 pages_dict = {
-    "Main Menu": [home_page, calendar_page, legacy_page],
-    "Pages Directory": dynamic_pages_objects
+    "Main Menu": [home_page, "cavpe_calendar.py", "Legacy_Dashboard.py"],
+    "Pages Directory": dynamic_pages
 }
 
-# Single call to st.navigation with default structural behavior
-# Setting expanded=True keeps sections open, while we leverage strict object routing
+# 7. Single Entry Navigation Instance Execution
 pg = st.navigation(pages_dict, position="sidebar", expanded=True)
-
-# Run router pipeline
 pg.run()

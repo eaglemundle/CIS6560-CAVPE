@@ -4,7 +4,7 @@ from engines.scoring_validation import cvss_severity
 
 st.set_page_config(page_title="CVE-level analysis", layout="wide")
 st.title("CVE-Level Analysis, Baseline ranked list v0")
-st.markdown("CVSS-only Baseline Prioritization Report with Deduplication (Press Ctrl+P to save as PDF)")
+st.markdown("CVSS-only Baseline Prioritization Report with Deduplication")
 
 ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SCORING_CONFIG_PATH = os.path.join(ROOT_DIR, "engines", "scoring_config.json")
