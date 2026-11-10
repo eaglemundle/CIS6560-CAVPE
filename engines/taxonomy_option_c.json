@@ -1,0 +1,13 @@
+{
+  "taxonomy_name": "CIS6560_Risk_Scoring_Taxonomy_OptionC",
+  "version": "1.0.0",
+  "_comment1": "DEVELOPER NOTE: Option C focuses on a Hybrid Strategy / Balanced Defensive Baseline",
+  "author": "Myunghee Jung",
+  "last_updated": "2026-10-25",
+  "option_name": "Option C (Hybrid / Mitigating Controls-Centric)",
+  "exposure_classification_mapping": {
+    "internet-facing": 4,
+    "restricted / segmented": 3,
+    "internal": 2
+  }
+}

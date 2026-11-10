@@ -1,0 +1,21 @@
+{
+  "effort_weights": {
+    "1-4 hours": 0.5,
+    "1-2 days": 0.8,
+    "3-5 days": 1.0,
+    "1-3 weeks": 3.0,
+    "1 month+": 5.0
+  },
+  "complexity_order": {
+    "Low": 0,
+    "Medium": 1,
+    "High": 2,
+    "Very High": 3
+  },
+  "patch_complexity_descriptions": {
+    "Low": "Routine patch / simple rollback",
+    "Medium": "Coordinated maintenance",
+    "High": "Compatibility or clustered-service testing",
+    "Very High": "Major upgrade, legacy dependency, or high outage risk"
+  }
+}

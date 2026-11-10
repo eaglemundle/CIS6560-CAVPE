@@ -2,14 +2,14 @@
   "taxonomy_name": "CIS6560_Risk_Scoring_Weights",
   "version": "2.0.0",
   "weights": {
-    "severity": 0.40,
+    "severity": 0.4,
     "exploited_in_the_wild": 0.15,
-    "poc_exploit_availability": 0.10,
-    "patch_difficulty": 0.10,
-    "compensating_controls": 0.10,
-    "asset_criticality": 0.10,
+    "poc_exploit_availability": 0.1,
+    "patch_difficulty": 0.1,
+    "compensating_controls": 0.1,
+    "asset_criticality": 0.1,
     "risk_transfer": 0.05
   },
-  "last_updated": "2026-11-08T15:33:26-05:00",
+  "last_updated": "2026-11-09 22:58:56",
   "selected_preset": "Charter Default"
 }
