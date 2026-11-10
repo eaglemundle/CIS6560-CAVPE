@@ -190,7 +190,7 @@ if st.session_state.df_assets is None and os.path.exists(CSV_FILE_PATH):
 
 # --- VIEW 1: MANUAL QUERY & WEIGHT TUNING MATRIX ---
 if menu_selection == "CVE Query & Tuning Matrix":
-    st.title("Dashboard V1.0 for Scoring Engine V1 Execution Phase")
+    st.title("Dashboard V0.0 - Lab Dataset")
     
     st.subheader("Asset Management")
     if st.session_state.df_assets is not None:
