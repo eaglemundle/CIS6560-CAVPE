@@ -61,7 +61,7 @@ def render_home_page():
         st.subheader("Version 2.0")
         st.caption("Latest Stable Version")
         if st.button("Run Version 2.0", key="go_v2", type="primary", use_container_width=True):
-            st.switch_page("pages/01_v2_dashboard.py")
+            st.switch_page("pages/00_v2_dashboard.py")
 
     st.markdown("<br>", unsafe_allow_html=True)
     st.divider()
