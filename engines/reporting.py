@@ -7,7 +7,7 @@ import pandas as pd
 from engines.kev_validation import KevCatalog, cve_level_kev_summary
 
 
-TAXONOMY_OPTIONS = ("A", "B")
+TAXONOMY_OPTIONS = ("A", "B", "C")
 
 
 def build_data_quality_report(
@@ -18,6 +18,8 @@ def build_data_quality_report(
     dimension = quality["dimension"]
     metric_rows = []
     for option in TAXONOMY_OPTIONS:
+        if option not in quality["exposure"]:
+            continue
         counts = quality["exposure"][option]
         metric_rows.extend(
             [
@@ -100,20 +102,30 @@ def write_scoring_export(
     run_info: pd.DataFrame,
     output_path: str | Path,
 ) -> Path:
-    unsupported_columns = [
-        column
-        for column in data.columns
-        if column == "Asset_Crit_C"
-        or str(column).endswith("_Option_C")
-        or "Option C" in str(column)
-    ]
+    unsupported_columns = []
+    for column in data.columns:
+        name = str(column)
+        if name.startswith("Asset_Crit_"):
+            option = name.removeprefix("Asset_Crit_")
+        elif "_Option_" in name:
+            option = name.rsplit("_Option_", 1)[1]
+        elif "Option " in name:
+            option = name.rsplit("Option ", 1)[1]
+        else:
+            continue
+        if option not in TAXONOMY_OPTIONS:
+            unsupported_columns.append(column)
     if unsupported_columns:
         raise ValueError(
-            "Scoring exports support only Options A and B; unsupported columns: "
+            "Scoring exports support only Options A, B, and C; unsupported columns: "
             + ", ".join(map(str, unsupported_columns))
         )
-    if "C" in quality["exposure"]:
-        raise ValueError("Scoring export quality data must contain only Options A and B")
+    unsupported_quality_options = set(quality["exposure"]) - set(TAXONOMY_OPTIONS)
+    if unsupported_quality_options:
+        raise ValueError(
+            "Scoring export quality data contains unsupported options: "
+            + ", ".join(sorted(unsupported_quality_options))
+        )
 
     path = Path(output_path)
     path.parent.mkdir(parents=True, exist_ok=True)

@@ -22,8 +22,9 @@ def score_dataset(
 ) -> tuple[pd.DataFrame, dict[str, Any], pd.Series]:
     """Return fully scored findings, quality metrics, and Option A exposure scores."""
     required_options = {"A", "B"}
+    supported_options = required_options | {"C"}
     missing_options = required_options - taxonomy_mappings.keys()
-    unknown_options = taxonomy_mappings.keys() - required_options
+    unknown_options = taxonomy_mappings.keys() - supported_options
     if missing_options or unknown_options:
         details = []
         if missing_options:
@@ -68,7 +69,9 @@ def score_dataset(
     result = data.copy()
     exposure_quality = {}
     option_a_exposure_scores = None
-    for option in "AB":
+    for option in ("A", "B", "C"):
+        if option not in taxonomy_mappings:
+            continue
         option_data = data.copy()
         exposure_scores, quality = map_exposure_classification(
             option_data, taxonomy_mappings[option], scoring_config

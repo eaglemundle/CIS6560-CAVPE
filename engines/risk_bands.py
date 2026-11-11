@@ -46,7 +46,13 @@ def add_risk_band_columns(
     if mode not in {"rescaled_24", "native_100"}:
         raise ValueError(f"Unsupported risk band mode: {mode}")
 
-    for option in "AB":
+    options = "AB" + (
+        "C"
+        if "Unrounded_Risk_Score_Option_C" in result
+        or "Final_Risk_Score_Option_C" in result
+        else ""
+    )
+    for option in options:
         score_column = f"Final_Risk_Score_Option_{option}"
         raw_column = f"Unrounded_Risk_Score_Option_{option}"
         score_values = result[raw_column] if raw_column in result else result[score_column]
@@ -72,7 +78,13 @@ def build_band_distribution(
     data: pd.DataFrame, scoring_config: dict[str, Any]
 ) -> pd.DataFrame:
     records = []
-    for option in "AB":
+    options = "AB" + (
+        "C"
+        if "Unrounded_Risk_Score_Option_C" in data
+        or "Final_Risk_Score_Option_C" in data
+        else ""
+    )
+    for option in options:
         score_column = f"Unrounded_Risk_Score_Option_{option}"
         if score_column not in data:
             score_column = f"Final_Risk_Score_Option_{option}"
