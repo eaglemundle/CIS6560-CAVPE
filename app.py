@@ -53,15 +53,15 @@ def render_home_page():
             
     with col3:
         st.subheader("Version 1.0")
-        st.caption("Active Development")
+        st.caption("Development")
         if st.button("Run Dev V1.7", key="go_v1_dev", type="primary", use_container_width=True):
             st.switch_page("pages/00_v1_dashboard.py")
             
     with col4:
         st.subheader("Version 2.0")
-        st.caption("Latest Stable Version")
+        st.caption("Latest Development")
         if st.button("Run Version 2.0", key="go_v2", type="primary", use_container_width=True):
-            st.switch_page("pages/00_v2_dashboard.py")
+            st.switch_page("pages/00_v2_Patch_Difficulty.py")
 
     st.markdown("<br>", unsafe_allow_html=True)
     st.divider()
