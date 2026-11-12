@@ -12,6 +12,12 @@ import streamlit as st
 load_dotenv()
 NVD_API_KEY = os.getenv("NVD_API_KEY")
 
+if not NVD_API_KEY:
+  try:
+    NVD_API_KEY = st.secrets["NVD_API_KEY"]
+  except Exception:
+    NVD_API_KEY = None
+
 NVD_URL = "https://services.nvd.nist.gov/rest/json/cves/2.0"
 DELAY = 0.7 if NVD_API_KEY else 6.5  # NVD rate limit: 50/30s with key, 5/30s without
 
