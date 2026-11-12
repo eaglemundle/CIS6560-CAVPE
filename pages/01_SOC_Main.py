@@ -1,5 +1,6 @@
 import json
 import os
+import datetime
 import numpy as np
 import pandas as pd
 import plotly.express as px
@@ -113,6 +114,37 @@ st.title("SOC Main Dashboard")
 v_data, input_path, input_rows = load_data()
 kev_catalog = load_kev()
 kev_notice = catalog_warning(kev_catalog)
+
+# Load and apply NVD API validated CVSS scores if available
+nvd_json_path = os.path.join(P_DIR, "outputs", "nvd_validated_scores.json")
+nvd_meta = None
+nvd_applied_count = 0
+
+if os.path.exists(nvd_json_path) and not v_data.empty:
+  try:
+    with open(nvd_json_path, "r", encoding="utf-8") as nvd_file:
+      nvd_meta = json.load(nvd_file)
+
+    score_map = nvd_meta.get("scores", {})
+    if score_map and "CVE ID" in v_data.columns:
+      use_nvd_scores = st.toggle(
+          "Use NVD API Validated CVSS Scores",
+          value=True,
+          help=(
+              "Replaces scanner CVSS base scores with verified NVD API scores"
+              " before risk scoring."
+          ),
+      )
+      if use_nvd_scores:
+        normalized_cves = v_data["CVE ID"].astype(str).str.strip().str.upper()
+        mapped_scores = normalized_cves.map(score_map)
+        nvd_applied_count = int(mapped_scores.notna().sum())
+        v_data["CVSS base score"] = mapped_scores.fillna(
+            v_data["CVSS base score"]
+        )
+  except (OSError, json.JSONDecodeError):
+    nvd_meta = None
+
 
 if not v_data.empty:
     with open(S_CONF, "r", encoding="utf-8") as scoring_config_file:
@@ -484,3 +516,28 @@ if (
       "are displayed."
   )
 
+
+# Section 10 (Footer)
+if kev_notice:
+  st.warning(kev_notice)
+elif kev_catalog:
+  released_date = kev_catalog.date_released.date()
+  days_old = (datetime.date.today() - released_date).days
+  st.caption(
+      f"CISA KEV snapshot {kev_catalog.version}, released {released_date} "
+      f"({days_old} day(s) old). For real-time NVD/KEV verification, use the"
+      " NVD API Score Validator page."
+  )
+
+if nvd_meta:
+  last_val = nvd_meta.get("last_validated", "N/A")
+  if nvd_applied_count > 0:
+    st.caption(
+        f"NVD Score Sync: Active ({nvd_applied_count} findings updated from"
+        f" NVD validation run at {last_val})."
+    )
+  else:
+    st.caption(
+        f"NVD Score Sync: Available (Last validated at {last_val}, currently"
+        " toggled off or 0 matching CVEs)."
+    )

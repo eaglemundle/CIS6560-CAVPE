@@ -1,4 +1,4 @@
 Mode_A,Mode_B,Kendall_tau,Top_30_overlap_count,Top_30_overlap,Data_note
-exposure_only,tier_only,0.8631438127090302,24,0.8,Asset-tier counts and control descriptions are synthetic.
-exposure_only,blend,0.8741583054626534,25,0.8333333333333334,Asset-tier counts and control descriptions are synthetic.
-tier_only,blend,0.9889855072463769,28,0.9333333333333333,Asset-tier counts and control descriptions are synthetic.
+exposure_only,tier_only,0.8625641025641025,23,0.7666666666666667,Asset-tier counts and control descriptions are synthetic.
+exposure_only,blend,0.8728651059085842,23,0.7666666666666667,Asset-tier counts and control descriptions are synthetic.
+tier_only,blend,0.9896989966555184,29,0.9666666666666667,Asset-tier counts and control descriptions are synthetic.
