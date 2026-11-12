@@ -55,7 +55,7 @@ else:
 # -------------------------------------------------------------
 # Source Input Module Section
 # -------------------------------------------------------------
-st.title("Sample Dataset")
+st.title("Project-Supplied Sample Dataset")
 
 if st.session_state.get("df_sample_excel") is not None:
     with st.container(border=True):

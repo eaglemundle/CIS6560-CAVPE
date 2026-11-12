@@ -53,16 +53,16 @@ with st.container(border=True):
     with info_col1:
         st.markdown("**Core Metrics**")
         st.markdown(
-            "- **Complexity Order:** 0 to 3 (Low = 0, Medium = 1, High = 2, Very High = 3)\n"
+            "- **Complexity Order:** Low = 0, Medium = 1, High = 2, Very High = 3\n"
             "- **Effort Weight:** 0.5 to 5.0 (Mapped based on estimated remediation duration)"
         )
     with info_col2:
         st.markdown("**Engine Sync**")
         st.markdown(
-            f"- **WeightConfig File:** `engines/weight_config.json` \n"
-            f"- **Remediation Weight File:** `reference_data/remediation_weights.json` \n"
+            f"- **Weight Config:** `engines/weight_config.json` \n"
+            f"- **Remediation Weight:** `reference_data/remediation_weights.json` \n"
             f"- **Preset Name:** `{selected_preset}` \n"
-            f"- **Weight Effect:** Impacting **{weights_config.get('patch_difficulty', 0.10)*100:.1f}%** of final Chartered Risk Score"
+            f"- **Weight Effect:** Impacting **{weights_config.get('patch_difficulty', 0.10)*100:.1f}%** of final Integrated Risk Score"
         )
     
     st.divider()

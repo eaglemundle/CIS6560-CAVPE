@@ -15,3 +15,11 @@ Option B,native_100,Low,0,0.0
 Option B,native_100,Medium,9,3.0
 Option B,native_100,High,180,60.0
 Option B,native_100,Critical,111,37.0
+Option C,rescaled_24,Low,0,0.0
+Option C,rescaled_24,Medium,5,1.6666666666666667
+Option C,rescaled_24,High,186,62.0
+Option C,rescaled_24,Critical,109,36.333333333333336
+Option C,native_100,Low,0,0.0
+Option C,native_100,Medium,6,2.0
+Option C,native_100,High,171,56.99999999999999
+Option C,native_100,Critical,123,41.0

@@ -101,23 +101,64 @@ if "active_taxonomy" not in st.session_state: st.session_state.active_taxonomy =
 
 # 5. Main Dashboard Header View Layout
 st.title("SOC Main Dashboard")
-st.subheader("Select Active Taxonomy Perspective")
+# st.subheader("Select Active Taxonomy Perspective")
+
+# st.caption(
+#     "Choose how asset network exposure weights are applied to prioritize vulnerabilities alongside CVSS."
+# )
+
+st.markdown(
+    """
+<style>
+div[data-testid="stExpander"] details:not([open]) > summary {
+    background-color: rgba(255, 140, 0, 0.18) !important;
+    border-radius: 0.5rem;
+}
+div[data-testid="stExpander"] details:not([open]) > summary:hover {
+    background-color: rgba(255, 140, 0, 0.28) !important;
+}
+div[data-testid="stExpander"] details {
+    border-color: rgba(255, 140, 0, 0.4) !important;
+}
+</style>
+""",
+    unsafe_allow_html=True,
+)
+
+with st.expander("**How do these perspectives differ?**", expanded=False):
+  st.markdown("""
+* **CVSS Only (Baseline)**  
+  Uses raw severity without network exposure weighting.
+
+* **Exposure-Centric**  
+  Prioritizes external attack surface.  
+  `internet-facing: 4` > `internal: 2` > `restricted: 1`
+
+* **Impact-Centric**  
+  Prioritizes high-value "crown jewel" assets isolated in segmented zones.  
+  `restricted: 4` > `internal: 2` > `internet-facing: 1`
+
+* **Balanced**  
+  Balances immediate external exposure with high-impact segmented assets.  
+  `internet-facing: 4` > `restricted: 3` > `internal: 2`
+""")
+
 btn_none, btn_a, btn_b, btn_c = st.columns(4)
 
 with btn_none:
-    if st.button("None", width="stretch", type="secondary" if st.session_state.active_taxonomy != "None" else "primary"):
+    if st.button("CVSS Only", width="stretch", type="secondary" if st.session_state.active_taxonomy != "None" else "primary"):
         st.session_state.active_taxonomy = "None"
         st.rerun()
 with btn_a:
-    if st.button("Option A", width="stretch", type="secondary" if st.session_state.active_taxonomy != "Option A" else "primary"):
+    if st.button("Exposure-Centric", width="stretch", type="secondary" if st.session_state.active_taxonomy != "Option A" else "primary"):
         st.session_state.active_taxonomy = "Option A"
         st.rerun()
 with btn_b:
-    if st.button("Option B", width="stretch", type="secondary" if st.session_state.active_taxonomy != "Option B" else "primary"):
+    if st.button("Impact-Centric", width="stretch", type="secondary" if st.session_state.active_taxonomy != "Option B" else "primary"):
         st.session_state.active_taxonomy = "Option B"
         st.rerun()
 with btn_c:
-    if st.button("Option C", width="stretch", type="secondary" if st.session_state.active_taxonomy != "Option C" else "primary"):
+    if st.button("Balanced", width="stretch", type="secondary" if st.session_state.active_taxonomy != "Option C" else "primary"):
         st.session_state.active_taxonomy = "Option C"
         st.rerun()
 
@@ -317,46 +358,3 @@ if not source_df.empty and "Asset group" in source_df.columns:
 else:
     st.warning("No tracking data available to analyze asset categories.")
 
-# 8. Matrix Queues
-def render_q(df):
-    if df.empty: return st.warning("No tracking items found inside current queue perspective.")
-    df_d = df.copy()
-    df_d.insert(0, "No.", np.arange(1, len(df_d) + 1))
-    cols = [c for c in ["No.", "Vulnerability title", "CVE ID", "CISA KEV Status", "Normalized Score", "CVSS base score"] if c in df_d.columns]
-    st.dataframe(df_d[cols + [c for c in df_d.columns if c not in cols and c not in ["Finding ID", "Data status"]]], width="stretch", height=400, hide_index=True)
-
-st.subheader("Strategic Model Comparison Matrix")
-t1, t2, t3 = st.tabs(["Active Framework Queue", "CISA KEV Feed Validation", "All Discovered Vulnerabilities"])
-with t1: render_q(v_data.sort_values(by=s_col, ascending=False) if tot > 0 else v_data)
-with t2: render_q(v_data[v_data["CISA KEV Status"] == "Confirmed - Active Exploitation"] if "CISA KEV Status" in v_data.columns else pd.DataFrame())
-with t3: render_q(v_data)
-
-
-
-# Scoring is calculated above; write the workbook only after an explicit request.
-st.subheader("Scoring Results Export")
-if not v_data.empty and st.button(
-    "Export scoring results", width="stretch", type="primary"
-):
-    if input_path is None:
-        st.error("Cannot export scoring results because the input workbook was not found.")
-    else:
-        run_info = build_run_info(
-            P_DIR,
-            input_path,
-            input_rows,
-            W_CONF,
-            weight_config,
-            S_CONF,
-            scoring_config,
-            TAX_FILES,
-            kev_catalog,
-        )
-        export_path = write_scoring_export(
-            v_data,
-            scoring_quality,
-            kev_catalog,
-            run_info,
-            OUTPUT_EXCEL_PATH,
-        )
-        st.success(f"Scoring export created: {export_path}")
