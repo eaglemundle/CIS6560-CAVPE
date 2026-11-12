@@ -94,6 +94,7 @@ def cached_score_data(data, weights, mappings, scoring_config, kev_catalog):
 
 def main():
     st.title("Automated Multi-Taxonomy Risk Scoring Engine")
+    st.warning("**Under Construction (Nov 12):** This dashboard is a work-in-progress and may not reflect the final design or functionality.")
     st.caption("Version 2.0")
     st.caption("Compare the exposure-centric Option A and business-impact-centric Option B.")
 

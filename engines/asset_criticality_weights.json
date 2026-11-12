@@ -1,0 +1,50 @@
+{
+  "taxonomy_name": "CIS6560_Asset_Criticality_Weights",
+  "version": "1.0.0",
+  "author": "Myunghee Jung",
+  "last_updated": "2026-11-12",
+  "tier_definitions": {
+    "3.0": "Critical: Identity, payment, safety, core business, crown-jewel data",
+    "2.0": "High: Important production infrastructure",
+    "1.0": "Medium: Standard production applications & servers",
+    "0.5": "Low: Dev / test / non-critical productivity"
+  },
+  "asset_group_bonus": {
+    "identity infrastructure": 3.0,
+    "identity / access": 3.0,
+    "e-commerce": 3.0,
+    "database": 3.0,
+    "cryptographic library": 3.0,
+    "network infrastructure": 2.0,
+    "network / remote access": 2.0,
+    "network / load balancing": 2.0,
+    "dns infrastructure": 2.0,
+    "file transfer / dmz": 2.0,
+    "virtualization": 2.0,
+    "container platform": 2.0,
+    "management platform": 2.0,
+    "mobile device management": 2.0,
+    "web application": 1.0,
+    "web server": 1.0,
+    "web server / load balancer": 1.0,
+    "application server": 1.0,
+    "application / middleware": 1.0,
+    "enterprise application": 1.0,
+    "email / collaboration": 1.0,
+    "email infrastructure": 1.0,
+    "search platform": 1.0,
+    "endpoint / server os": 1.0,
+    "linux os": 1.0,
+    "linux os / library": 1.0,
+    "developer platform": 0.5,
+    "endpoint / productivity": 0.5
+  },
+  "volume_bonus_rules": {
+    "critical_assets_high_threshold": 5,
+    "critical_assets_high_bonus": 2.0,
+    "critical_assets_base_bonus": 1.5,
+    "internet_facing_high_threshold": 5,
+    "internet_facing_high_bonus": 1.0,
+    "internet_facing_base_bonus": 0.5
+  }
+}

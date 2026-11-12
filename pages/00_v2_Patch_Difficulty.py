@@ -221,7 +221,7 @@ if st.session_state.get("df_coordinated_excel") is not None:
 
         st.markdown("---")
         st.markdown("##### High-Friction Bottleneck Inspection Queue (Very High Items)")
-        st.markdown("##### Under Construction: Nov 12")
+        # st.markdown("##### Under Construction: Nov 12")
         st.markdown("Direct tracking list for the 22 vulnerabilities causing the engineering bottleneck.")
 
         df_bottleneck = df_heatmap_sync[
