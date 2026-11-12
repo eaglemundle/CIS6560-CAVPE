@@ -107,6 +107,237 @@ st.title("SOC Main Dashboard")
 #     "Choose how asset network exposure weights are applied to prioritize vulnerabilities alongside CVSS."
 # )
 
+
+
+# 6. Engine Processing
+v_data, input_path, input_rows = load_data()
+kev_catalog = load_kev()
+kev_notice = catalog_warning(kev_catalog)
+
+if not v_data.empty:
+    with open(S_CONF, "r", encoding="utf-8") as scoring_config_file:
+        scoring_config = json.load(scoring_config_file)
+    with open(W_CONF, "r", encoding="utf-8") as weight_file:
+        weight_config = json.load(weight_file)
+    weight_dict = weight_config["weights"]
+    taxonomy_mappings = {
+        option: get_matrix_config(option)[1] for option in "ABC"
+    }
+    v_data, scoring_quality, option_a_exposure = cached_score_data(
+        v_data, weight_dict, taxonomy_mappings, scoring_config, kev_catalog
+    )
+    dimension_quality = scoring_quality["dimension"]
+    exposure_quality = scoring_quality["exposure"]
+    if dimension_quality["controls_unmatched_count"]:
+        st.warning(
+            f"{dimension_quality['controls_unmatched_count']} findings have "
+            "control text that matched no configured category."
+        )
+    if dimension_quality["unknown_count"]:
+        st.warning(
+            f"{dimension_quality['unknown_count']} patch-complexity value(s) "
+            "used the configured default."
+        )
+    asset_mode_comparison = compare_asset_criticality_modes(
+        v_data,
+        option_a_exposure,
+        scoring_config["asset_criticality"],
+        weight_dict,
+        scoring_config,
+    )
+    write_asset_criticality_comparison(asset_mode_comparison)
+    # st.caption(
+    #     "Option A comparison uses synthetic asset-tier counts and control descriptions."
+    # )
+    band_distribution = build_band_distribution(v_data, scoring_config)
+    band_output_path = os.path.join(P_DIR, "outputs", "band_distribution.csv")
+    os.makedirs(os.path.dirname(band_output_path), exist_ok=True)
+    band_distribution.to_csv(band_output_path, index=False)
+    # st.caption(
+    #     f"Risk bands use {scoring_config['risk_bands']['mode']}; distributions "
+    #     "for both scales are saved under outputs/."
+    # )
+
+is_dyn = not v_data.empty and "Exposure classification" in v_data.columns and st.session_state.active_taxonomy != "None"
+if is_dyn:
+    active_opt = st.session_state.active_taxonomy[-1]
+    v_data["Normalized Score"] = v_data[
+        f"Unrounded_Risk_Score_Option_{active_opt}"
+    ]
+    active_quality = exposure_quality[active_opt]
+    if active_quality["blank_count"] or active_quality["unmapped_count"]:
+        st.warning(
+            "Exposure data quality: "
+            f"{active_quality['blank_count']} blank value(s), "
+            f"{active_quality['unmapped_count']} unmapped value(s). "
+            "Configured defaults were applied."
+        )
+        exposure = v_data["Exposure classification"]
+        missing = exposure.isna() | exposure.astype(str).str.strip().eq("")
+        unknown = (
+            exposure.astype(str)
+            .str.strip()
+            .str.lower()
+            .map(get_matrix_config(active_opt)[1])
+            .isna()
+            & ~missing
+        )
+        st.dataframe(
+            v_data.loc[missing | unknown, ["Finding ID", "Exposure classification"]]
+        )
+
+# 7. UI Metrics & Charts (Compact Layout)
+tot = len(v_data)
+s_col = "Normalized Score" if is_dyn else "CVSS base score"
+
+count_2026_unique = (
+    v_data[v_data["CVE ID"].astype(str).str.startswith("CVE-2026")][
+        "CVE ID"
+    ].nunique()
+    if tot > 0
+    else 0
+)
+
+# Compact top summary line
+st.caption(
+    f"**Total Active Detections:** {tot:,}  |  **Unique 2026 CVEs:**"
+    f" {count_2026_unique:,}"
+)
+
+base_crit = len(v_data[v_data["CVSS base score"] >= 9.0]) if tot > 0 else 0
+base_high_crit = len(v_data[v_data["CVSS base score"] >= 7.0]) if tot > 0 else 0
+
+metric_perspectives = [
+    ("CVSS Only", "None", None),
+    ("Exposure-Centric", "Option A", "Risk_Level_Option_A"),
+    ("Impact-Centric", "Option B", "Risk_Level_Option_B"),
+    ("Balanced", "Option C", "Risk_Level_Option_C"),
+]
+
+m_cols = st.columns(4)
+
+for col, (label, opt_key, level_col) in zip(m_cols, metric_perspectives):
+  with col:
+    with st.container(border=True):
+      active_tag = (
+          " · :orange[**Active**]"
+          if st.session_state.active_taxonomy == opt_key
+          else ""
+      )
+      st.markdown(f"**{label}**{active_tag}")
+
+      if level_col is None:
+        crit_cnt = base_crit
+        high_cnt = base_high_crit
+        crit_diff = "Baseline"
+        high_diff = "Baseline"
+      else:
+        if tot > 0 and level_col in v_data.columns:
+          crit_cnt = int(v_data[level_col].eq("Critical").sum())
+          high_cnt = int(v_data[level_col].isin(["High", "Critical"]).sum())
+        else:
+          crit_cnt = 0
+          high_cnt = 0
+
+        crit_diff = f"{crit_cnt - base_crit:+d} vs CVSS"
+        high_diff = f"{high_cnt - base_high_crit:+d} vs CVSS"
+
+      # Side-by-side compact HTML metrics inside each card to prevent vertical scrolling
+      st.markdown(
+          f"""
+                <div style="display: flex; justify-content: space-between; margin-top: 6px;">
+                    <div>
+                        <div style="font-size: 0.75rem; color: #666;">Critical</div>
+                        <div style="font-size: 1.35rem; font-weight: 700; line-height: 1.2;">{crit_cnt:,}</div>
+                        <div style="font-size: 0.7rem; color: #FF8C00;">{crit_diff}</div>
+                    </div>
+                    <div>
+                        <div style="font-size: 0.75rem; color: #666;">High + Critical</div>
+                        <div style="font-size: 1.35rem; font-weight: 700; line-height: 1.2;">{high_cnt:,}</div>
+                        <div style="font-size: 0.7rem; color: #FF8C00;">{high_diff}</div>
+                    </div>
+                </div>
+                """,
+          unsafe_allow_html=True,
+      )
+
+
+col1, col2, col3 = st.columns(3)
+
+col1, col2, col3 = st.columns(3)
+
+# Column 1: Asset Group
+with col1:
+    if tot > 0 and "Asset group" in v_data.columns:
+        st.plotly_chart(px.pie(v_data["Asset group"].value_counts().reset_index(name="Count"), values="Count", names="Asset group", hole=0.4, title="Detections by Asset Group"), width="stretch")
+
+# Column 2: Exposure Classification
+with col2:
+    if tot > 0 and "Exposure classification" in v_data.columns:
+        counts = v_data['Exposure classification'].value_counts().reset_index(name="Count")
+        counts.columns = ['Classification', 'Count']
+        
+        fig = px.pie(counts, values='Count', names='Classification', title='Count by Exposure Classification', hole=0.4)
+        fig.update_traces(textinfo='value', textposition='inside')
+        st.plotly_chart(fig, width="stretch")
+    else:
+        st.warning("No exposure classification data.")
+
+# Column 3: Dynamic Risk Level Distribution based on Active Perspective
+with col3:
+  if tot > 0:
+    # Map internal session keys to user-facing perspective labels
+    perspective_labels = {
+        "None": "CVSS Only",
+        "Option A": "Exposure-Centric",
+        "Option B": "Impact-Centric",
+        "Option C": "Balanced",
+    }
+    active_label = perspective_labels.get(
+        st.session_state.active_taxonomy, "CVSS Only"
+    )
+
+    if is_dyn:
+      active_opt = st.session_state.active_taxonomy[-1]
+      level_col = f"Risk_Level_Option_{active_opt}"
+    else:
+      # Derive standard CVSS severity bands when CVSS Only is active
+      v_data["CVSS_Severity_Band"] = pd.cut(
+          v_data["CVSS base score"],
+          bins=[-0.1, 3.9, 6.9, 8.9, 10.0],
+          labels=["Low", "Medium", "High", "Critical"],
+      )
+      level_col = "CVSS_Severity_Band"
+
+    chart_title = f"Count by Risk Level ({active_label})"
+
+    if level_col in v_data.columns:
+      r_counts = v_data[level_col].value_counts().reset_index(name="Count")
+      r_counts.columns = ["Risk Level", "Count"]
+
+      # Consistent color mapping across severity levels
+      color_map = {
+          "Critical": "#D9534F",
+          "High": "#F0AD4E",
+          "Medium": "#5BC0DE",
+          "Low": "#5CB85C",
+      }
+      fig = px.pie(
+          r_counts,
+          values="Count",
+          names="Risk Level",
+          title=chart_title,
+          hole=0.4,
+          color="Risk Level",
+          color_discrete_map=color_map,
+      )
+      fig.update_traces(textinfo="value", textposition="inside")
+      st.plotly_chart(fig, width="stretch")
+    else:
+      st.warning("Risk level calculation column is missing.")
+  else:
+    st.warning("No risk level data available.")
+
 st.markdown(
     """
 <style>
@@ -164,197 +395,92 @@ with btn_c:
 
 st.markdown("---")
 
-# 6. Engine Processing
-v_data, input_path, input_rows = load_data()
-kev_catalog = load_kev()
-kev_notice = catalog_warning(kev_catalog)
-if kev_notice:
-    st.warning(kev_notice)
-elif kev_catalog:
-    st.caption(
-        f"CISA KEV snapshot {kev_catalog.version}, released "
-        f"{kev_catalog.date_released.date()}."
-    )
+# 9. Actionable Mitigation Directives (Top N Prioritized by Perspective)
+header_col, select_col = st.columns((6, 1), vertical_alignment="center")
+
+with select_col:
+  top_n = st.selectbox(
+      "Items to display",
+      options=(3, 5, 10, 15),
+      index=1,
+      label_visibility="collapsed",
+  )
+
+with header_col:
+  st.markdown(
+      f"### **Top {top_n} Risk Rankings by Exposure Classification Mapping**"
+  )
+
 if not v_data.empty:
-    with open(S_CONF, "r", encoding="utf-8") as scoring_config_file:
-        scoring_config = json.load(scoring_config_file)
-    with open(W_CONF, "r", encoding="utf-8") as weight_file:
-        weight_config = json.load(weight_file)
-    weight_dict = weight_config["weights"]
-    taxonomy_mappings = {
-        option: get_matrix_config(option)[1] for option in "ABC"
-    }
-    v_data, scoring_quality, option_a_exposure = cached_score_data(
-        v_data, weight_dict, taxonomy_mappings, scoring_config, kev_catalog
-    )
-    dimension_quality = scoring_quality["dimension"]
-    exposure_quality = scoring_quality["exposure"]
-    if scoring_quality["severity_mismatches_before"]:
-        st.warning(
-            f"{scoring_quality['severity_mismatches_before']} source CVSS "
-            "severity label(s) disagree with the numeric score; recomputed labels "
-            "are displayed."
-        )
-    if dimension_quality["controls_unmatched_count"]:
-        st.warning(
-            f"{dimension_quality['controls_unmatched_count']} findings have "
-            "control text that matched no configured category."
-        )
-    if dimension_quality["unknown_count"]:
-        st.warning(
-            f"{dimension_quality['unknown_count']} patch-complexity value(s) "
-            "used the configured default."
-        )
-    asset_mode_comparison = compare_asset_criticality_modes(
-        v_data,
-        option_a_exposure,
-        scoring_config["asset_criticality"],
-        weight_dict,
-        scoring_config,
-    )
-    write_asset_criticality_comparison(asset_mode_comparison)
-    st.caption(
-        "Option A comparison uses synthetic asset-tier counts and control descriptions."
-    )
-    band_distribution = build_band_distribution(v_data, scoring_config)
-    band_output_path = os.path.join(P_DIR, "outputs", "band_distribution.csv")
-    os.makedirs(os.path.dirname(band_output_path), exist_ok=True)
-    band_distribution.to_csv(band_output_path, index=False)
-    st.caption(
-        f"Risk bands use {scoring_config['risk_bands']['mode']}; distributions "
-        "for both scales are saved under outputs/."
-    )
+  perspectives = (
+      ("CVSS Only", "CVSS base score", False),
+      ("Exposure-Centric", "Unrounded_Risk_Score_Option_A", True),
+      ("Impact-Centric", "Unrounded_Risk_Score_Option_B", True),
+      ("Balanced", "Unrounded_Risk_Score_Option_C", True),
+  )
 
-is_dyn = not v_data.empty and "Exposure classification" in v_data.columns and st.session_state.active_taxonomy != "None"
-if is_dyn:
-    active_opt = st.session_state.active_taxonomy[-1]
-    v_data["Normalized Score"] = v_data[
-        f"Unrounded_Risk_Score_Option_{active_opt}"
-    ]
-    active_quality = exposure_quality[active_opt]
-    if active_quality["blank_count"] or active_quality["unmapped_count"]:
-        st.warning(
-            "Exposure data quality: "
-            f"{active_quality['blank_count']} blank value(s), "
-            f"{active_quality['unmapped_count']} unmapped value(s). "
-            "Configured defaults were applied."
-        )
-        exposure = v_data["Exposure classification"]
-        missing = exposure.isna() | exposure.astype(str).str.strip().eq("")
-        unknown = (
-            exposure.astype(str)
-            .str.strip()
-            .str.lower()
-            .map(get_matrix_config(active_opt)[1])
-            .isna()
-            & ~missing
-        )
-        st.dataframe(
-            v_data.loc[missing | unknown, ["Finding ID", "Exposure classification"]]
-        )
+  cols = st.columns(4)
 
-# 7. UI Metrics & Charts
-tot = len(v_data)
-s_col = "Normalized Score" if is_dyn else "CVSS base score"
+  for col, (label, score_col, is_weighted) in zip(cols, perspectives):
+    with col:
+      with st.container(border=True):
+        st.markdown(f"**{label}**")
 
-# Calculate Contextual Priority metrics dynamically based on configuration threshold rules
-if is_dyn:
-    active_opt = st.session_state.active_taxonomy[-1]
-    risk_level_column = f"Risk_Level_Option_{active_opt}"
-    priority_count = int(v_data[risk_level_column].eq("Critical").sum())
-    high_count = int(v_data[risk_level_column].isin(["High", "Critical"]).sum())
-    priority_label = "Contextual Priority (Critical band)"
+        if score_col in v_data.columns:
+          top_n_df = v_data.sort_values(by=score_col, ascending=False).head(
+              top_n
+          )
+
+          for rank, (_, r) in enumerate(top_n_df.iterrows(), start=1):
+            score_val = r.get(score_col, 0)
+            formatted_score = (
+                f"{score_val:.2f}" if is_weighted else f"{score_val:.1f}"
+            )
+            cve_id = str(r.get("CVE ID", "No CVE"))
+            title = str(r.get("Vulnerability title", "Untitled Finding"))
+            exposure = str(r.get("Exposure classification", "Unknown"))
+
+            short_title = title if len(title) <= 38 else title[:35] + "..."
+
+            st.caption(
+                f"**#{rank} {cve_id}** · :orange[**{formatted_score}**]  \n"
+                f"{short_title}  \n"
+                f"Exposure: **{exposure}**"
+            )
 else:
-    priority_count = len(v_data[v_data["CVSS base score"] >= 9.0]) if tot > 0 else 0
-    priority_label = "Contextual Priority (CVSS >= 9.0)"
-    high_count = len(v_data[v_data["CVSS base score"] >= 7.0])
+  st.warning("No tracking data available to analyze mitigation directives.")
 
-c2, c3, c4, c1 = st.columns(4)
-c2.metric(priority_label, f"{priority_count:,}")
-c3.metric("High or Critical Risk Band" if is_dyn else "High Risk (CVSS >= 7.0)", high_count)
 
-count_2026 = v_data['CVE ID'].astype(str).str.startswith('CVE-2026').sum()
-count_2026_unique = v_data[v_data['CVE ID'].astype(str).str.startswith('CVE-2026')]['CVE ID'].nunique()
-if 'df' not in locals() and 'df' not in globals():
-    # Example fallback so the app doesn't crash if df is genuinely missing
-    df = pd.DataFrame({'CVE ID': ['CVE-2026-0001', 'CVE-2025-1234', 'CVE-2026-0002']})
-    
-c4.metric(label="Unique 2026 CVEs", value=f"{count_2026_unique:,}")
+# 10. Footer: Data Provenance & Active Weight Configuration
+st.markdown("---")
 
-c1.metric("Total Active Detections", f"{tot:,}")
+if "weight_config" in locals() and weight_config:
+  preset_name = weight_config.get("selected_preset", "Custom Profile")
+  last_updated = weight_config.get("last_updated", "N/A")
 
-col1, col2, col3 = st.columns(3)
+  st.caption(
+      f"Active Scoring Weights: **{preset_name}** (Last updated:"
+      f" {last_updated})"
+  )
+  with st.expander("View Active Weight Configuration (JSON)", expanded=False):
+    st.json(weight_config)
 
-col1, col2, col3 = st.columns(3)
+if kev_notice:
+  st.warning(kev_notice)
+elif kev_catalog:
+  st.caption(
+      f"CISA KEV snapshot {kev_catalog.version}, released "
+      f"{kev_catalog.date_released.date()}."
+  )
 
-# Column 1: Asset Group
-with col1:
-    if tot > 0 and "Asset group" in v_data.columns:
-        st.plotly_chart(px.pie(v_data["Asset group"].value_counts().reset_index(name="Count"), values="Count", names="Asset group", hole=0.4, title="Detections by Asset Group"), width="stretch")
-
-# Column 2: Exposure Classification
-with col2:
-    if tot > 0 and "Exposure classification" in v_data.columns:
-        counts = v_data['Exposure classification'].value_counts().reset_index(name="Count")
-        counts.columns = ['Classification', 'Count']
-        
-        fig = px.pie(counts, values='Count', names='Classification', title='Count by Exposure Classification', hole=0.4)
-        fig.update_traces(textinfo='value', textposition='inside')
-        st.plotly_chart(fig, width="stretch")
-    else:
-        st.warning("No exposure classification data.")
-
-# Column 3: Contextual Priority (Raw Clumn Value - Recalculate!!!)
-with col3:
-    if tot > 0 and 'Contextual priority' in v_data.columns:
-        p_counts = v_data['Contextual priority'].value_counts().reset_index(name="Count")
-        p_counts.columns = ['Priority', 'Count']
-        
-        fig = px.pie(p_counts, values='Count', names='Priority', title='Count by Contextual Priority', hole=0.4)
-        fig.update_traces(textinfo='value', textposition='inside')
-        st.plotly_chart(fig, width="stretch")
-    else:
-        st.warning("No contextual priority data available.")
-
-# 4. Actionable Mitigation Directives (Top 5 Prioritized per Top 5 Affected Asset Groups)
-st.markdown("### **Actionable Mitigation Directives (Top 5 Prioritized for Top 5 Affected Asset Groups):**")
-
-compiled_df = load_compiled_model_data()
-
-# 1. Determine active sorting column based on active taxonomy view
-if is_dyn:
-    if st.session_state.active_taxonomy == "Option A":
-        model_sort_col = "Final_Risk_Score_Option_A"
-    elif st.session_state.active_taxonomy == "Option C":
-        model_sort_col = "Final_Risk_Score_Option_C"
-    else:
-        model_sort_col = "Final_Risk_Score_Option_B"
-else:
-    model_sort_col = "CVSS base score"
-
-# 2. Select data source (compiled model file takes precedence over memory cache)
-source_df = compiled_df if (compiled_df is not None and not compiled_df.empty and model_sort_col in compiled_df.columns) else v_data
-
-if not source_df.empty and "Asset group" in source_df.columns:
-    # 3. Find the top 5 asset groups based on total detection count (affected assets count)
-    top_5_asset_counts = source_df["Asset group"].value_counts().head(5)
-    top_5_assets = top_5_asset_counts.index.tolist()
-    
-    if top_5_assets:
-        # 4. Dynamically generate tab components with total affected count in the label
-        asset_tabs = st.tabs([f"🌐 {asset} ({top_5_asset_counts[asset]})" for asset in top_5_assets])
-        
-        # 5. Populate each tab with its respective top 5 prioritized findings
-        for tab, asset in zip(asset_tabs, top_5_assets):
-            with tab:
-                asset_top_5 = source_df[source_df["Asset group"] == asset].sort_values(by=model_sort_col, ascending=False).head(5)
-                
-                if not asset_top_5.empty:
-                    for _, r in asset_top_5.iterrows():
-                        score_val = r.get(model_sort_col, r.get(s_col, 0))
-                        st.info(f"**{str(r.get('CVE ID', 'No CVE'))}**: {r.get('Vulnerability title', 'Untitled Finding')} (Risk Score: {score_val})")
-                else:
-                    st.write("No findings detected for this asset group.")
-else:
-    st.warning("No tracking data available to analyze asset categories.")
+if (
+    "scoring_quality" in locals()
+    and scoring_quality
+    and scoring_quality.get("severity_mismatches_before")
+):
+  st.caption(
+      f"Note: {scoring_quality['severity_mismatches_before']} source CVSS "
+      "severity label(s) disagree with the numeric score; recomputed labels "
+      "are displayed."
+  )
 

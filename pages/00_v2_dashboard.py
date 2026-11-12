@@ -219,11 +219,6 @@ if st.session_state.get("df_coordinated_excel") is not None:
             "($22 \\text{ CVEs} \\times 2 \\text{ weeks median effort} = 44 \\text{ man-weeks}$) and carry steep service outage risks."
         )
 
-        st.warning(
-            "**SOC Action Plan:** Deploy **compensating controls** (e.g., firewalls) immediately, "
-            "as final patching will take months of infrastructure planning."
-        )
-
         st.markdown("---")
         st.markdown("##### High-Friction Bottleneck Inspection Queue (Very High Items)")
         st.markdown("##### Under Construction: Nov 12")
