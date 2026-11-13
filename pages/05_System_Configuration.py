@@ -57,6 +57,9 @@ elif os.path.exists(COORDINATED_LEDGER_PATH):
 
 
 # --- Active Dataset Status & Schema Health ---
+
+current_dataset_path = get_active_dataset_path()
+
 st.subheader("Active Dataset Status")
 if os.path.exists(current_dataset_path):
     is_valid, schema_err = validate_file_schema(current_dataset_path)
