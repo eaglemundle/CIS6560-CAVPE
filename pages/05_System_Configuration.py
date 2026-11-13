@@ -4,12 +4,26 @@ import json
 import pandas as pd
 import streamlit as st
 import numpy as np
+from app_utils.config_manager import (
+    get_active_dataset_path,
+    validate_file_schema,
+    REQUIRED_COLUMNS,
+    list_reference_datasets,
+    REF_DATA_DIR,
+    update_dataset_path,
+    get_version_history,
+)
+
+
+try:
+    API_KEY = st.secrets.get("NVD_API_KEY", "")
+except Exception:
+    API_KEY = os.getenv("NVD_API_KEY", "")
+
 
 ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if ROOT_DIR not in sys.path:
     sys.path.insert(0, ROOT_DIR)
-
-from app_utils.config_manager import get_active_dataset_path
 
 EXCEL_FILE_PATH = get_active_dataset_path()
 COORDINATED_LEDGER_PATH = os.path.join(ROOT_DIR, "reference_data", "vulnerability_coordinated_ledger.xlsx")
