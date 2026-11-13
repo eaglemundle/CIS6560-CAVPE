@@ -1,15 +1,16 @@
 {
-  "taxonomy_name": "CIS6560_Risk_Scoring_Weights",
-  "version": "2.0.0",
-  "weights": {
-    "severity": 0.1,
-    "exploited_in_the_wild": 0.15,
-    "poc_exploit_availability": 0.1,
-    "patch_difficulty": 0.4,
-    "compensating_controls": 0.1,
-    "asset_criticality": 0.1,
-    "risk_transfer": 0.05
-  },
-  "last_updated": "2026-11-11 22:04:20",
-  "selected_preset": "Custom Profile"
+    "taxonomy_name": "CIS6560_Risk_Scoring_Weights",
+    "version": "2.0.0",
+    "weights": {
+        "severity": 0.1,
+        "exploited_in_the_wild": 0.15,
+        "poc_exploit_availability": 0.1,
+        "patch_difficulty": 0.4,
+        "compensating_controls": 0.1,
+        "asset_criticality": 0.1,
+        "risk_transfer": 0.05
+    },
+    "last_updated": "2026-11-11 22:04:20",
+    "selected_preset": "Custom Profile",
+    "dataset_path": "C:\\Users\\eagle\\OneDrive\\Desktop\\CIS6560_Cybersecurity Project\\CAVPE\\CIS-6560-02\\reference_data\\vulnerability_contextualization_scanner_sample_02.xlsx"
 }

@@ -1,20 +1,50 @@
 import os
+import sys
 import pandas as pd
 import streamlit as st
 
-EXCEL_FILE_PATH = "reference_data/vulnerability_contextualization_scanner_sample_updated.xlsx"
-COORDINATED_LEDGER_PATH = "reference_data/vulnerability_coordinated_ledger.xlsx"
+ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if ROOT_DIR not in sys.path:
+    sys.path.insert(0, ROOT_DIR)
 
-if st.session_state.get("df_sample_excel") is None and os.path.exists(EXCEL_FILE_PATH):
-    try: st.session_state.df_sample_excel = pd.read_excel(EXCEL_FILE_PATH)
-    except Exception as e: st.error(f"Error reading sample excel: {e}")
+from app_utils.config_manager import (
+    get_active_dataset_path,
+    get_config_version,
+    get_last_updated_by,
+)
 
-if st.session_state.get("df_coordinated_excel") is None and os.path.exists(COORDINATED_LEDGER_PATH):
-    try: st.session_state.df_coordinated_excel = pd.read_excel(COORDINATED_LEDGER_PATH)
-    except Exception as e: st.error(f"Error reading coordinated ledger: {e}")
+EXCEL_FILE_PATH = get_active_dataset_path()
+
+if (
+    st.session_state.get("df_sample_excel") is None
+    or st.session_state.get("loaded_dataset_path") != EXCEL_FILE_PATH
+):
+    if os.path.exists(EXCEL_FILE_PATH):
+        try:
+            if EXCEL_FILE_PATH.lower().endswith(".csv"):
+                st.session_state.df_sample_excel = pd.read_csv(EXCEL_FILE_PATH)
+            else:
+                st.session_state.df_sample_excel = pd.read_excel(EXCEL_FILE_PATH)
+            st.session_state.loaded_dataset_path = EXCEL_FILE_PATH
+        except Exception as e:
+            st.error(f"Error reading active dataset: {e}")
 
 st.title("Asset Inventory Master List")
 st.markdown("Aggregated infrastructure summary with an interactive deep-dive vulnerability drill-down interface.")
+st.caption(
+    f"**Active Dataset:** `{os.path.basename(EXCEL_FILE_PATH)}` "
+    # f"(`{get_config_version()}` | Updated by: {get_last_updated_by()})"
+)
+
+if st.session_state.get("df_sample_excel") is not None:
+    df_base = st.session_state.df_sample_excel.copy()
+
+
+if (
+    st.session_state.get("df_coordinated_excel") is None
+    and st.session_state.get("df_sample_excel") is not None
+):
+    st.session_state.df_coordinated_excel = st.session_state.df_sample_excel.copy()
 
 if st.session_state.get("df_coordinated_excel") is not None:
     df_base = st.session_state.df_coordinated_excel.copy()

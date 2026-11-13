@@ -1,13 +1,20 @@
 import os
+import sys
 import json
 import pandas as pd
 import streamlit as st
 import numpy as np
 
-EXCEL_FILE_PATH = "reference_data/vulnerability_contextualization_scanner_sample_updated.xlsx"
-COORDINATED_LEDGER_PATH = "reference_data/vulnerability_coordinated_ledger.xlsx"
-REMEDIATION_JSON_PATH = "engines/remediation_weights.json"
-WEIGHT_CONFIG_JSON_PATH = "engines/weight_config.json"
+ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if ROOT_DIR not in sys.path:
+    sys.path.insert(0, ROOT_DIR)
+
+from app_utils.config_manager import get_active_dataset_path
+
+EXCEL_FILE_PATH = get_active_dataset_path()
+COORDINATED_LEDGER_PATH = os.path.join(ROOT_DIR, "reference_data", "vulnerability_coordinated_ledger.xlsx")
+REMEDIATION_JSON_PATH = os.path.join(ROOT_DIR, "engines", "remediation_weights.json")
+WEIGHT_CONFIG_JSON_PATH = os.path.join(ROOT_DIR, "engines", "weight_config.json")
 
 # --- Load remediation mapping data directly from JSON ---
 with open(REMEDIATION_JSON_PATH, "r", encoding="utf-8") as f:
@@ -25,13 +32,20 @@ raw_risk_data = risk_data
 weights_config = risk_data["weights"]
 selected_preset = risk_data["selected_preset"]
 
-
-# --- Load Excel datasets ---
-if st.session_state.get("df_sample_excel") is None and os.path.exists(EXCEL_FILE_PATH):
-    try:
-        st.session_state.df_sample_excel = pd.read_excel(EXCEL_FILE_PATH)
-    except Exception as e:
-        st.error(f"Error reading sample excel dataset: {e}")
+# --- Load Excel/CSV datasets ---
+if (
+    st.session_state.get("df_sample_excel") is None
+    or st.session_state.get("loaded_dataset_path") != EXCEL_FILE_PATH
+):
+    if os.path.exists(EXCEL_FILE_PATH):
+        try:
+            if EXCEL_FILE_PATH.lower().endswith(".csv"):
+                st.session_state.df_sample_excel = pd.read_csv(EXCEL_FILE_PATH)
+            else:
+                st.session_state.df_sample_excel = pd.read_excel(EXCEL_FILE_PATH)
+            st.session_state.loaded_dataset_path = EXCEL_FILE_PATH
+        except Exception as e:
+            st.error(f"Error reading sample dataset: {e}")
 
 if st.session_state.get("df_coordinated_excel") is not None:
     pass
@@ -40,6 +54,7 @@ elif os.path.exists(COORDINATED_LEDGER_PATH):
         st.session_state.df_coordinated_excel = pd.read_excel(COORDINATED_LEDGER_PATH)
     except Exception as e:
         st.error(f"Error reading coordinated ledger dataset: {e}")
+
 
 # --- Streamlit UI and Dashboard Rendering ---
 st.title("Patch Difficulty Metrics Dashboard")

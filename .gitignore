@@ -10,3 +10,13 @@ prioritized_list_v1.json
 scan_reports/
 __pycache__/
 *.pyc
+
+
+# Streamlit local secrets
+.streamlit/secrets.toml
+
+engines/dataset_config.json
+
+# Ignore local runtime dataset config & temporary test files
+engines/dataset_config.json
+reference_data/generated_*.xlsx
