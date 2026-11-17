@@ -1,6 +1,9 @@
 import streamlit as st
 import os
 from datetime import datetime
+from zoneinfo import ZoneInfo
+
+LOCAL_TZ = ZoneInfo("America/Toronto")
 
 # 1. Global Page Config (Must be the absolute first Streamlit command)
 st.set_page_config(
@@ -13,7 +16,7 @@ st.set_page_config(
 file_path = __file__
 if os.path.exists(file_path):
     mtime = os.path.getmtime(file_path)
-    last_modified_date = datetime.fromtimestamp(mtime).strftime('%Y-%m-%d %H:%M:%S')
+    last_modified_date = datetime.fromtimestamp(mtime, tz=LOCAL_TZ).strftime('%Y-%m-%d %H:%M:%S %Z')
     
     st.markdown(
         f"""

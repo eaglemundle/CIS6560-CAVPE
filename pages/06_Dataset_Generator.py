@@ -2,6 +2,7 @@ import datetime
 import glob
 import json
 import os
+from zoneinfo import ZoneInfo
 import numpy as np
 import pandas as pd
 import streamlit as st
@@ -10,6 +11,8 @@ try:
     st.set_page_config(page_title="Scenario Dataset Generator", layout="wide")
 except st.errors.StreamlitAPIException:
     pass
+
+LOCAL_TZ = ZoneInfo("America/Toronto")
 
 ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
 if os.path.basename(ROOT_DIR) == "pages":
@@ -116,7 +119,7 @@ if st.button("Generate Dataset", type="primary"):
 
     excel_sheets[target_sheet] = df
     os.makedirs(REF_DIR, exist_ok=True)
-    ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    ts = datetime.datetime.now(LOCAL_TZ).strftime("%Y%m%d_%H%M%S")
     save_path = os.path.join(REF_DIR, f"generated_{prefix}_{ts}.xlsx")
     with pd.ExcelWriter(save_path, engine="openpyxl") as writer:
         for s_name, s_df in excel_sheets.items():
@@ -133,7 +136,8 @@ st.divider()
 latest_file = get_latest_generated_file()
 
 if latest_file and os.path.exists(latest_file):
-    mod_time = datetime.datetime.fromtimestamp(os.path.getmtime(latest_file)).strftime("%Y-%m-%d %H:%M:%S")
+    raw_mtime = os.path.getmtime(latest_file)
+    mod_time = datetime.datetime.fromtimestamp(raw_mtime, tz=LOCAL_TZ).strftime("%Y-%m-%d %H:%M:%S %Z")
     
     with st.container(border=True):
         info_col, btn_col = st.columns((78, 22), vertical_alignment="center")
