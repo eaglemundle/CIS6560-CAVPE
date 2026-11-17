@@ -30,11 +30,16 @@ TAXONOMY_FILES = {
     option: ENGINE_DIR / f"taxonomy_option_{option.lower()}.json"
     for option in "AB"
 }
-INPUT_EXCEL_PATH = (
-    ROOT_DIR
-    / "reference_data"
-    / "vulnerability_contextualization_scanner_sample_updated.xlsx"
-)
+# INPUT_EXCEL_PATH = (
+#     ROOT_DIR
+#     / "reference_data"
+#     / "vulnerability_contextualization_scanner_sample_updated.xlsx"
+# )
+
+from app_utils.config_manager import get_active_dataset_path
+
+INPUT_EXCEL_PATH = Path(get_active_dataset_path())
+
 OUTPUT_DIR = ROOT_DIR / "outputs"
 OUTPUT_EXCEL_PATH = OUTPUT_DIR / "multi_taxonomy_weighted_risk_model.xlsx"
 
@@ -84,6 +89,8 @@ def load_scoring_config():
 
 @st.cache_data(show_spinner=False)
 def load_input_data(path: str, modified_ns: int, size: int) -> pd.DataFrame:
+    if path.lower().endswith(".csv"):
+        return pd.read_csv(path)
     return pd.read_excel(path, engine="openpyxl")
 
 

@@ -56,6 +56,8 @@ elif os.path.exists(COORDINATED_LEDGER_PATH):
         st.error(f"Error reading coordinated ledger dataset: {e}")
 
 
+
+
 # --- Streamlit UI and Dashboard Rendering ---
 st.title("Patch Difficulty Metrics Dashboard")
 
@@ -77,7 +79,7 @@ with st.container(border=True):
             f"- **Weight Config:** `engines/weight_config.json` \n"
             f"- **Remediation Weight:** `reference_data/remediation_weights.json` \n"
             f"- **Preset Name:** `{selected_preset}` \n"
-            f"- **Weight Effect:** Impacting **{weights_config.get('patch_difficulty', 0.10)*100:.1f}%** of final Integrated Risk Score"
+            f"- **Weight Effect:** Impacting :red[**{weights_config.get('patch_difficulty', 0.10)*100:.1f}%**] of final Integrated Risk Score"
         )
     
     st.divider()

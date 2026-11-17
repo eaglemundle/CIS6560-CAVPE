@@ -79,7 +79,7 @@ except Exception as e:
     st.error(f"Error loading active dataset (`{os.path.basename(EXCEL_FILE_PATH)}`): {e}")
 # --- 5. Top Status Card UI ---
 st.title("Asset Criticality & Validation Metrics Dashboard")
-st.warning("**Under Construction (Nov 12):** Asset Criticality scoring rules and categories are still being fine-tuned.")
+st.warning("**Under Construction (Nov 17):** Asset Criticality scoring rules and categories are still being fine-tuned.")
 
 w_severity = weights_config.get("severity", 0.10)
 w_criticality = weights_config.get("asset_criticality", 0.10)
@@ -110,7 +110,7 @@ with st.container(border=True):
             f"- **Asset Criticality Config:** `engines/asset_criticality_weights.json` \n"
             f"- **Active Taxonomy:** `{option_display_name}` \n"
             f"- **NVD Validated Scores:** `outputs/nvd_validated_scores.json` (**{len(nvd_validated_map)} CVEs**, updated `{nvd_last_validated}`) \n"
-            f"- **Weight Effect:** Impacting **{w_criticality*100:.1f}%** of final Integrated Risk Score"
+            f"- **Weight Effect:** Impacting :red[**{w_criticality*100:.1f}%**] of final Integrated Risk Score"
         )
 
     st.divider()
