@@ -41,12 +41,6 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# 2. Native Multipage Directory Scanning Enforcer
-# This explicit declaration prevents the left sidebar menu from disappearing due to numeric file naming layout conflicts
-with st.sidebar:
-    st.markdown("### Navigation Controls")
-    st.markdown("---")
-
 # Synced path to look inside the 'engines' subfolder for absolute consistency
 W_CONF = os.path.join(P_DIR, "engines", "weight_config.json")
 S_CONF = os.path.join(P_DIR, "engines", "scoring_config.json")
