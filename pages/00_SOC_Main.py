@@ -241,6 +241,135 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
+active_df = None
+for var_val in list(locals().values()):
+    if isinstance(var_val, pd.DataFrame) and "Critical assets" in var_val.columns:
+        active_df = var_val
+        break
+
+if active_df is not None and not active_df.empty:
+    # Reduce default vertical gap between blocks for a compact single-screen view
+    st.markdown(
+        """
+        <style>
+            .block-container { padding-top: 1.5rem; padding-bottom: 1rem; }
+            div[data-testid="stVerticalBlock"] > div { gap: 0.5rem; }
+        </style>
+        """,
+        unsafe_allow_html=True
+    )
+
+    pivot_crit = active_df.pivot_table(
+        index="Asset group",
+        columns="Exposure classification",
+        values="Critical assets",
+        aggfunc="sum",
+        fill_value=0
+    )
+
+    preferred_cols = ["Internet-facing", "Restricted / segmented", "Internal"]
+    ordered_cols = [c for c in preferred_cols if c in pivot_crit.columns] + [
+        c for c in pivot_crit.columns if c not in preferred_cols
+    ]
+    pivot_crit = pivot_crit[ordered_cols]
+
+    pivot_crit["Total"] = pivot_crit.sum(axis=1)
+    pivot_crit = pivot_crit.sort_values("Total", ascending=True).drop(columns=["Total"]).tail(6)
+
+    # 3-Column Horizontal Layout with Individual Section Headers
+    col_hm, col_m1, col_m2 = st.columns((52, 24, 24), vertical_alignment="top")
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+
+    with col_hm:
+        st.markdown("**Criticality Density (Exposure vs. Asset Group)**")
+        fig_hm = px.imshow(
+            pivot_crit,
+            text_auto=True,
+            aspect="auto",
+            color_continuous_scale="YlOrRd",
+            labels=dict(x="Exposure", y="Asset Group", color="Critical")
+        )
+        fig_hm.update_layout(
+            height=210,
+            margin=dict(l=0, r=5, t=0, b=0),
+            xaxis_title="",
+            yaxis_title="",
+            coloraxis_colorbar=dict(title="", thickness=8, len=0.9)
+        )
+        fig_hm.update_traces(
+            hovertemplate="<b>%{y}</b> | %{x}<br>Critical Assets: <b>%{z}</b><extra></extra>"
+        )
+        st.plotly_chart(fig_hm, use_container_width=True)
+
+    with col_m1:
+        st.markdown("**Evaluation Model 01**")
+        stacked = pivot_crit.stack()
+        top_asset_group, top_exposure = stacked.idxmax()
+        top_value = int(stacked.max())
+
+        with st.container(border=True):
+            st.markdown(":blue-background[**EXPOSURE & IMPACT**] **Asset Criticality**")
+            st.markdown(f"**{top_value:,} Critical** in {top_asset_group} ({top_exposure})")
+            if st.button(
+                "Asset Criticality  ›",
+                key="btn_go_asset_crit",
+                type="primary",
+                use_container_width=True
+            ):
+                st.switch_page(os.path.join(current_dir, "01_Asset_Criticality.py"))
+
+    with col_m2:
+        st.markdown("**Evaluation Model 02**")
+        low_diff_count = int((active_df["Patch complexity"].str.lower() == "low").sum())
+        low_diff_pct = round((low_diff_count / len(active_df)) * 100)
+
+        with st.container(border=True):
+            st.markdown(":orange-background[**REMEDIATION EFFORT**] **Patch Difficulty**")
+            st.markdown(f"**{low_diff_count} Quick Wins** ({low_diff_pct}% Low complexity)")
+            if st.button(
+                "Patch Difficulty  ›",
+                key="btn_go_patch_diff",
+                type="primary",
+                use_container_width=True
+            ):
+                st.switch_page(os.path.join(current_dir, "01_Patch_Difficulty.py"))
+
+    # --- Compact Remediation Insight Banner ---
+    top_pct = 10
+    top_n = max(1, int(len(active_df) * (top_pct / 100)))
+
+    priority_map = {"Critical": 4, "High": 3, "Medium": 2, "Low": 1}
+    df_calc = active_df.copy()
+    df_calc["priority_rank"] = df_calc["Contextual priority"].map(priority_map).fillna(0)
+
+    top_df = df_calc.sort_values(
+        by=["priority_rank", "Critical assets", "CVSS base score"],
+        ascending=[False, False, False]
+    ).head(top_n)
+
+    total_critical_assets = df_calc["Critical assets"].sum()
+    remediated_critical_assets = top_df["Critical assets"].sum()
+    risk_reduction = round((remediated_critical_assets / total_critical_assets) * 100) if total_critical_assets > 0 else 0
+
+    with st.container(border=True):
+        banner_col1, banner_col2 = st.columns((78, 22), vertical_alignment="center")
+        
+        with banner_col1:
+            st.markdown(
+                f":green-background[**ACTION PLAN**] **Remediation Insight:** Patching top **{top_pct}%** ({top_n} findings) "
+                f"remediates **:green[{risk_reduction}%]** ({remediated_critical_assets:,}/{total_critical_assets:,}) "
+                f"of exposed **Critical Assets**."
+            )
+            
+        with banner_col2:
+            if st.button(
+                "Analyze Trade-off  ›",
+                key="btn_go_tradeoff",
+                type="primary",
+                use_container_width=True
+            ):
+                st.switch_page(os.path.join(current_dir, "02_Remediation_Tradeoff.py"))
+
 
 base_crit = len(v_data[v_data["CVSS base score"] >= 9.0]) if tot > 0 else 0
 base_high_crit = len(v_data[v_data["CVSS base score"] >= 7.0]) if tot > 0 else 0
@@ -438,6 +567,7 @@ with btn_c:
         st.rerun()
 
 st.markdown("---")
+
 
 # 9. Actionable Mitigation Directives (Top N Prioritized by Perspective)
 header_col, select_col = st.columns((6, 1), vertical_alignment="center")

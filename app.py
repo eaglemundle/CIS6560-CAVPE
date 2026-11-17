@@ -89,23 +89,90 @@ def render_home_page():
         else:
             st.error("File missing: doc/project_charter.pdf")
 
+# Resolve absolute directory of app.py to ensure consistent path resolution
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+SOC_MAIN_FILE = "00_SOC_Main.py"
+
+# 3. Main Dashboard Renderer
+def render_home_page():
+    st.title("Context-Aware Vulnerability Prioritization Engine")
+    
+    col1, col2, col3, col4 = st.columns(4)
+    with col1:
+        st.subheader("Version 0.0")
+        st.caption("for Streamlit testing")
+        if st.button("Run Version 0.0", key="go_v0", use_container_width=True):
+            st.switch_page(os.path.join(BASE_DIR, "Legacy_Dashboard.py"))
+            
+    with col2:
+        st.subheader("SOC Main (Latest)")
+        st.caption("Primary Dashboard")
+        if st.button("Run SOC Main", key="go_v1_old", type="primary", use_container_width=True):
+            st.switch_page(os.path.join(BASE_DIR, "pages", SOC_MAIN_FILE))
+            
+    with col3:
+        st.subheader("Version 1.0")
+        st.caption("Development")
+        if st.button("Run Dev V1.7", key="go_v1_dev", use_container_width=True):
+            st.switch_page(os.path.join(BASE_DIR, "pages", "00_v1_dashboard.py"))
+            
+    with col4:
+        st.subheader("Version 2.0")
+        st.caption("Latest Development")
+        if st.button("Run Version 2.0", key="go_v2", use_container_width=True):
+            st.switch_page(os.path.join(BASE_DIR, "pages", "00_v2_Patch_Difficulty.py"))
+
+    st.markdown("<br>", unsafe_allow_html=True)
+    st.divider()
+    st.subheader("Calendar & Project Documentation")
+    st.write("View the current schedule and official project artifacts.")
+    
+    doc_col1, doc_col2, doc_col3, doc_col4 = st.columns(4)
+    with doc_col1:
+        if st.button("Open Project Calendar", key="go_calendar", use_container_width=True):
+            st.switch_page(os.path.join(BASE_DIR, "cavpe_calendar.py"))
+            
+    with doc_col2:
+        doc_path = os.path.join(BASE_DIR, "doc", "project_charter.pdf")
+        if os.path.exists(doc_path):
+            with open(doc_path, "rb") as file:
+                st.download_button(
+                    label="Download Project Charter",
+                    data=file,
+                    file_name=os.path.basename(doc_path),
+                    mime="application/octet-stream",
+                    use_container_width=True,
+                    key="download_charter",
+                    help="Click to download the local Project Charter file."
+                )
+        else:
+            st.error("File missing: doc/project_charter.pdf")
+
 # 4. Explicitly Setup Page Objects
 home_page = st.Page(render_home_page, title="Home Selector")
+soc_main_path = os.path.join(BASE_DIR, "pages", SOC_MAIN_FILE)
+soc_main_page = st.Page(soc_main_path, title="SOC Main", default=True)
 
 # 5. Dynamically Collect Pages with Safety Validation
-pages_dir = "pages"
+pages_dir = os.path.join(BASE_DIR, "pages")
 dynamic_pages = []
 
 if os.path.exists(pages_dir):
     sorted_files = sorted(os.listdir(pages_dir))
     for filename in sorted_files:
-        if filename.endswith(".py"):
-            full_path = os.path.join(pages_dir, filename).replace("\\", "/")
+        # Exclude 00_SOC_Main.py since it is registered explicitly as default
+        if filename.endswith(".py") and filename != SOC_MAIN_FILE:
+            full_path = os.path.join(pages_dir, filename)
             dynamic_pages.append(full_path)
 
 # 6. Construct Strict Framework Data Structure
 pages_dict = {
-    "Main Menu": [home_page, "cavpe_calendar.py", "Legacy_Dashboard.py"],
+    "Main Menu": [
+        soc_main_page,
+        home_page,
+        os.path.join(BASE_DIR, "cavpe_calendar.py"),
+        os.path.join(BASE_DIR, "Legacy_Dashboard.py")
+    ],
     "Pages Directory": dynamic_pages
 }
 
