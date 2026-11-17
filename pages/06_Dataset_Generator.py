@@ -1,4 +1,5 @@
 import datetime
+import glob
 import json
 import os
 import numpy as np
@@ -28,6 +29,16 @@ def get_valid_exposure_labels():
         return [ext, intr, seg]
     return ["Internet-facing", "Internal", "Restricted"]
 
+# Find the most recently generated dataset in reference_data
+def get_latest_generated_file():
+    if not os.path.exists(REF_DIR):
+        return None
+    pattern = os.path.join(REF_DIR, "generated_*.xlsx")
+    files = glob.glob(pattern)
+    if not files:
+        return None
+    return max(files, key=os.path.getmtime)
+
 EXP_LABELS = get_valid_exposure_labels()
 
 SCENARIOS = {
@@ -43,7 +54,6 @@ desc, probs, c_rng, h_rng, m_rng, l_rng, drop_prob, prefix = SCENARIOS[name]
 n_rows = c2.number_input("Row Count", 1, 300, 300)
 changed_by = c3.text_input("Changed By", value=st.session_state.get("current_user", "Analyst"))
 up_file = c4.file_uploader("Upload Source Excel (Optional)", type=["xlsx"])
-
 
 if name == "Custom":
     p1, p2, p3, p4 = st.columns(4)
@@ -112,5 +122,38 @@ if st.button("Generate Dataset", type="primary"):
         for s_name, s_df in excel_sheets.items():
             s_df.to_excel(writer, sheet_name=s_name, index=False)
 
-    st.success(f"Saved to reference_data: `{os.path.basename(save_path)}`")
-    st.dataframe(df.head(20), use_container_width=True)
+    st.success(
+        f"**New Dataset Generated Successfully**\n\n"
+        f"- **File Name:** `{os.path.basename(save_path)}`\n"
+        f"- **Saved Path:** `{os.path.abspath(save_path)}`"
+    )
+
+# 4. Display Most Recently Generated File Info & Preview
+st.divider()
+latest_file = get_latest_generated_file()
+
+if latest_file and os.path.exists(latest_file):
+    mod_time = datetime.datetime.fromtimestamp(os.path.getmtime(latest_file)).strftime("%Y-%m-%d %H:%M:%S")
+    
+    with st.container(border=True):
+        info_col, btn_col = st.columns((78, 22), vertical_alignment="center")
+        with info_col:
+            st.markdown(
+                f"**Latest Generated Dataset:** `{os.path.basename(latest_file)}` *(Created: {mod_time})*\n\n"
+                f"**Full Path:** `{os.path.abspath(latest_file)}`"
+            )
+        with btn_col:
+            with open(latest_file, "rb") as f:
+                st.download_button(
+                    label="Download Latest Excel",
+                    data=f,
+                    file_name=os.path.basename(latest_file),
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    use_container_width=True
+                )
+
+    latest_sheets = pd.read_excel(latest_file, sheet_name=None)
+    preview_sheet = next((s for s, d in latest_sheets.items() if "Finding ID" in d.columns), list(latest_sheets.keys())[0])
+    st.dataframe(latest_sheets[preview_sheet].head(20), use_container_width=True)
+else:
+    st.caption(f"No generated datasets found in `{os.path.abspath(REF_DIR)}` yet.")
