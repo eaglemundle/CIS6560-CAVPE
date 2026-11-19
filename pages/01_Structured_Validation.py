@@ -141,10 +141,11 @@ def calc_score(df: pd.DataFrame, w: dict[str, float]) -> pd.Series:
     )
 st.title("Structured Validation & Scenario Comparison")
 st.caption(
-    f"Dataset: **{os.path.basename(EXCEL_PATH)}** (`{get_config_version()}`) | "
+    f"Mode: **Multi-Scenario Dataset Comparison** | "
     f"Taxonomy: **{ACTIVE_TAX_NAME}** | Preset: **{preset}** (`v{w_ver}`)"
 )
-st.warning("**Status: Under Active Development** — Additional refinements and metric calibrations are scheduled for Wednesday, Nov 18.")
+
+st.error("**Status: Under Construction** Scheduled for Thursday, Nov 19 or Nov 20.")
 
 # with st.expander("How This Page Works (Domain Alignment & Validation Principles)"):
 #     st.markdown(
@@ -156,7 +157,7 @@ st.warning("**Status: Under Active Development** — Additional refinements and 
 #     )
 
 # SECTION 1: MULTI-SCENARIO COMPARISON
-st.header("1. Scenario Comparison (Context-Aware Engine Response)")
+st.header("Multi-Scenario Dataset Comparison")
 ref_dir = os.path.join(ROOT_DIR, "reference_data")
 scenario_specs = [
     ("BASELINE", "Original Sample", "green", os.path.join(ref_dir, "vulnerability_contextualization_scanner_sample_updated.xlsx")),
@@ -203,30 +204,101 @@ else:
         qw_cnt = int((s_df["Patch complexity"].astype(str).str.lower() == "low").sum())
         qw_pct = round((qw_cnt / max(1, len(s_df))) * 100)
 
+             # Theme color map for each scenario dataset card
+        theme_styles = {
+            "green": {"border": "#10B981", "bg": "rgba(16, 185, 129, 0.05)", "pill_bg": "rgba(16, 185, 129, 0.14)", "text": "#047857"},
+            "red": {"border": "#EF4444", "bg": "rgba(239, 68, 68, 0.05)", "pill_bg": "rgba(239, 68, 68, 0.14)", "text": "#B91C1C"},
+            "blue": {"border": "#3B82F6", "bg": "rgba(59, 130, 246, 0.05)", "pill_bg": "rgba(59, 130, 246, 0.14)", "text": "#1D4ED8"},
+            "orange": {"border": "#F97316", "bg": "rgba(249, 115, 22, 0.05)", "pill_bg": "rgba(249, 115, 22, 0.14)", "text": "#C2410C"},
+        }
+        th = theme_styles.get(color, theme_styles["blue"])
+        fname = os.path.basename(f_path)
+
         with scen_cols[idx]:
             with st.container(border=True):
-                st.markdown(f":{color}-background[**{badge}**] **{label}**")
-                st.caption(f"`{os.path.basename(f_path)}`")
+                # 1. Color-coded Scenario Header & Highlighted Dataset Filename Pill
+                st.markdown(
+                    f"""
+                    <div style="border-left: 4px solid {th['border']}; background-color: {th['bg']};
+                                padding: 8px 10px; border-radius: 6px; margin-bottom: 10px;">
+                        <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 5px;">
+                            <span style="background-color: {th['border']}; color: #FFFFFF;
+                                         font-weight: 700; font-size: 0.72rem; padding: 2px 7px;
+                                         border-radius: 4px; letter-spacing: 0.03em;">
+                                {badge}
+                            </span>
+                            <span style="font-weight: 700; font-size: 1.02rem; color: #1E293B;">
+                                {label}
+                            </span>
+                        </div>
+                        <div style="background-color: {th['pill_bg']}; color: {th['text']};
+                                    font-family: monospace; font-size: 0.75rem; font-weight: 600;
+                                    padding: 3px 8px; border-radius: 4px; white-space: nowrap;
+                                    overflow: hidden; text-overflow: ellipsis;"
+                             title="{fname}">
+                             {fname}
+                        </div>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+
+                # 2. Compact 2-column KPI metrics without truncation
                 m1, m2 = st.columns(2)
                 m1.metric("Top-10% Internet", f"{inet_pct:.1f}%")
-                m2.metric("Critical Protected", f"{crit_pct:.1f}% ({crit_cnt:,})")
+                m2.metric("Critical Protected", f"{crit_pct:.1f}%", delta=f"{crit_cnt:,} assets", delta_color="off")
+
+                # 3. Fixed-height IMPACT / EFFORT block so tables align across all columns
                 st.markdown(
-                    f":blue-background[**IMPACT**] **{hot_val:,} Critical** in {hot_grp} ({hot_exp})  \n"
-                    f":orange-background[**EFFORT**] **{qw_cnt} Quick Wins** ({qw_pct}% Low complexity)"
+                    f"""
+                    <div style="min-height: 88px; display: flex; flex-direction: column;
+                                justify-content: center; font-size: 0.86rem; line-height: 1.45;
+                                margin: 4px 0 8px 0;">
+                        <div>
+                            <span style="background-color: rgba(37, 99, 235, 0.14); color: #1D4ED8;
+                                         font-weight: 700; padding: 1px 6px; border-radius: 4px;
+                                         font-size: 0.75rem;">IMPACT</span>
+                            <b>{hot_val:,} Critical</b> in {hot_grp} ({hot_exp})
+                        </div>
+                        <div style="margin-top: 6px;">
+                            <span style="background-color: rgba(249, 115, 22, 0.15); color: #C2410C;
+                                         font-weight: 700; padding: 1px 6px; border-radius: 4px;
+                                         font-size: 0.75rem;">EFFORT</span>
+                            <b>{qw_cnt} Quick Wins</b> ({qw_pct}% Low complexity)
+                        </div>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
                 )
-                st.dataframe(
+
+                # 4. Shorten "restricted / segmented" -> "Segmented" so Score column is never cut off
+                preview_df = (
                     top_s[["Finding ID", "Exposure classification", "Critical assets", "score"]]
-                    .rename(columns={"Exposure classification": "Exposure", "Critical assets": "Crit", "score": "Score"})
-                    .head(5).assign(Score=lambda d: d["Score"].map("{:.3f}".format)),
-                    hide_index=True, use_container_width=True
+                    .rename(columns={
+                        "Finding ID": "ID",
+                        "Exposure classification": "Exposure",
+                        "Critical assets": "Crit",
+                        "score": "Score",
+                    })
+                    .head(5)
+                    .copy()
                 )
+                preview_df["Exposure"] = preview_df["Exposure"].replace(
+                    {"restricted / segmented": "Segmented", "Restricted / Segmented": "Segmented"}
+                )
+                preview_df["Score"] = preview_df["Score"].map("{:.3f}".format)
+
+                st.dataframe(preview_df, hide_index=True, use_container_width=True)
+
 
 # SECTION 2: STRUCTURED VALIDATION
 scored_df, q_meta = add_dimension_scores(raw_df, engine_cfg)
 scored_df["base_score"] = calc_score(scored_df, BASE_W)
 
 st.divider()
-st.header("2. Structured Validation")
+st.header("Structured Validation")
+st.caption(f"Validating active dataset: **{os.path.basename(EXCEL_PATH)}** (`{get_config_version()}`)")
+
 
 s_col = scored_df["base_score"]
 inet_m = s_col[scored_df["Exposure classification"].str.contains("internet", case=False, na=False)].mean()

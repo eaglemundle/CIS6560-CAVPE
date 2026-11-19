@@ -315,21 +315,34 @@ df["Remediation Decision Matrix"] = np.select(
 
 st.subheader("Remediation Decision Matrix")
 
+# Add subtle deterministic horizontal jitter so overlapping points spread out visibly
+rng = np.random.default_rng(42)
+plot_df = df.copy()
+plot_df["Patch Difficulty (Jittered)"] = (
+    plot_df["Patch Difficulty Index"] + rng.uniform(-0.22, 0.22, size=len(plot_df))
+)
+
 fig = px.scatter(
-    df,
-    x="Patch Difficulty Index",
+    plot_df,
+    x="Patch Difficulty (Jittered)",
     y="Asset Criticality Index",
     color="Remediation Decision Matrix",
     size="CVSS base score",
-    hover_data=[
-        "CVE ID",
-        "Affected product",
-        "Asset group",
-        "Patch complexity",
-        "Estimated remediation effort",
-    ],
-    height=700,
+    opacity=0.72,
+    hover_name="Finding ID",
+    hover_data={
+        "Patch Difficulty (Jittered)": False,   # Hide jittered value in tooltip
+        "Patch Difficulty Index": ":.2f",       # Show exact original index in tooltip
+        "CVE ID": True,
+        "Affected product": True,
+        "Asset group": True,
+        "Patch complexity": True,
+        "Estimated remediation effort": True,
+    },
+    height=420,
 )
+
+fig.update_traces(marker=dict(line=dict(width=0.6, color="white")))
 
 fig.add_vline(
     x=patch_threshold,
@@ -343,33 +356,47 @@ fig.add_hline(
     line_color="gray",
 )
 
+fig.update_layout(
+    xaxis_title="Patch Difficulty Index",
+    margin=dict(l=10, r=10, t=45, b=10),
+    legend=dict(
+        orientation="h",
+        yanchor="bottom",
+        y=1.02,
+        xanchor="left",
+        x=0,
+        title="",
+    ),
+)
+
 st.plotly_chart(
     fig,
     use_container_width=True,
 )
 
 
+
 # =====================================================
 # SUMMARY SECTION
 # =====================================================
 
-left, right = st.columns(2)
+st.subheader("Decision Matrix Distribution")
+left, right = st.columns((38, 62), vertical_alignment="center")
+
+matrix_summary = (
+    df["Remediation Decision Matrix"]
+    .value_counts()
+    .reset_index()
+)
+matrix_summary.columns = ["Category", "Count"]
+matrix_summary["Share (%)"] = (matrix_summary["Count"] / len(df) * 100).round(1).astype(str) + "%"
 
 with left:
-    st.subheader("Decision Matrix Distribution")
-
-    matrix_summary = (
-        df["Remediation Decision Matrix"]
-        .value_counts()
-        .reset_index()
-    )
-
-    matrix_summary.columns = ["Category", "Count"]
-
     st.dataframe(
         matrix_summary,
         hide_index=True,
         use_container_width=True,
+        height=178,  # Exact height for header + 4 rows (no empty trailing rows)
     )
 
 with right:
@@ -378,12 +405,20 @@ with right:
         x="Category",
         y="Count",
         color="Category",
+        text_auto=True,
+        height=230,
+    )
+    fig2.update_layout(
+        margin=dict(l=10, r=10, t=20, b=10),
+        showlegend=False,
+        xaxis_title="",
     )
 
     st.plotly_chart(
         fig2,
         use_container_width=True,
     )
+
 
 
 # =====================================================
