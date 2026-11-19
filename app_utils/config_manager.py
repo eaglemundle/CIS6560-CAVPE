@@ -329,3 +329,6 @@ def load_active_dataset(validate: bool = True) -> pd.DataFrame:
 
     mtime = os.path.getmtime(active_path)
     return _read_dataset_cached(active_path, mtime)
+
+reset_config_to_default()
+
