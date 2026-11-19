@@ -374,7 +374,7 @@ if active_df is not None and not active_df.empty:
                 type="primary",
                 use_container_width=True
             ):
-                st.switch_page(os.path.join(current_dir, "02_Remediation_Tradeoff.py"))
+                st.switch_page(os.path.join(current_dir, "01_Remediation_Tradeoff.py"))
 
 
 base_crit = len(v_data[v_data["CVSS base score"] >= 9.0]) if tot > 0 else 0
