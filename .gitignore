@@ -20,3 +20,16 @@ engines/dataset_config.json
 # Ignore local runtime dataset config & temporary test files
 engines/dataset_config.json
 reference_data/generated_*.xlsx
+
+check_files.py
+
+# Local only scripts
+obsolete/
+Update_CISA_KEV_Catalog.py
+build_ranked_list.py
+extract.py
+generate_test_dataset.py
+inspect_xml.py
+pipeline_greenbone_nvd.py
+run_nvd.py
+scripts/sensitivity.py
