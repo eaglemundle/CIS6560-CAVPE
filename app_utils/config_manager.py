@@ -308,3 +308,24 @@ def list_reference_datasets() -> list[str]:
         f for f in os.listdir(REF_DATA_DIR)
         if f.endswith((".xlsx", ".xls", ".csv")) and not f.startswith("~$")
     ])
+@st.cache_data(show_spinner=False)
+def _read_dataset_cached(file_path: str, mtime: float) -> pd.DataFrame:
+    """Read CSV or Excel dataset with mtime-based cache invalidation."""
+    if file_path.lower().endswith(".csv"):
+        return pd.read_csv(file_path)
+    return pd.read_excel(file_path)
+
+
+def load_active_dataset(validate: bool = True) -> pd.DataFrame:
+    """Load the currently configured active dataset and optionally validate its schema."""
+    active_path = get_active_dataset_path()
+    if not active_path or not os.path.exists(active_path):
+        raise FileNotFoundError(f"Active dataset not found: {active_path}")
+
+    if validate:
+        is_valid, err_msg = validate_file_schema(active_path)
+        if not is_valid:
+            raise ValueError(err_msg)
+
+    mtime = os.path.getmtime(active_path)
+    return _read_dataset_cached(active_path, mtime)
