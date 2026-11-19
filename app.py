@@ -152,7 +152,7 @@ def render_home_page():
             st.error("File missing: doc/project_charter.pdf")
 
 # 4. Explicitly Setup Page Objects
-home_page = st.Page(render_home_page, title="Home Selector")
+# home_page = st.Page(render_home_page, title="Home Selector")
 soc_main_path = os.path.join(BASE_DIR, "pages", SOC_MAIN_FILE)
 soc_main_page = st.Page(soc_main_path, title="SOC Main", default=True)
 
@@ -171,10 +171,10 @@ if os.path.exists(pages_dir):
 # 6. Construct Strict Framework Data Structure
 pages_dict = {
     "Main Menu": [
-        soc_main_page,
-        home_page,
-        os.path.join(BASE_DIR, "cavpe_calendar.py"),
-        os.path.join(BASE_DIR, "Legacy_Dashboard.py")
+        soc_main_page
+        # home_page,
+        # os.path.join(BASE_DIR, "cavpe_calendar.py")
+        # os.path.join(BASE_DIR, "Legacy_Dashboard.py")
     ],
     "Pages Directory": dynamic_pages
 }
@@ -182,3 +182,5 @@ pages_dict = {
 # 7. Single Entry Navigation Instance Execution
 pg = st.navigation(pages_dict, position="sidebar", expanded=True)
 pg.run()
+
+
