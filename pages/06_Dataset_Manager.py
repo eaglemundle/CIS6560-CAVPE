@@ -1,6 +1,7 @@
 import datetime
 import os
 import sys
+from zoneinfo import ZoneInfo
 import pandas as pd
 import streamlit as st
 
@@ -65,8 +66,11 @@ if files:
                 "Filename": f,
                 "Category": category,
                 "Size (KB)": round(stat.st_size / 1024, 1),
-                "Last Modified": datetime.datetime.fromtimestamp(stat.st_mtime).strftime("%Y-%m-%d %H:%M:%S"),
+                "Last Modified": datetime.datetime.fromtimestamp(
+                    stat.st_mtime, tz=ZoneInfo("America/Toronto")
+                ).strftime("%Y-%m-%d %H:%M:%S"),
             })
+
         st.dataframe(pd.DataFrame(inventory), use_container_width=True, hide_index=True)
 
         selected_file = st.selectbox("Select Dataset to Manage", options=files)

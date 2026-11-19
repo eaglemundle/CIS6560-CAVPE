@@ -239,13 +239,24 @@ count_2026_unique = (
 
 active_filename = os.path.basename(input_path) if input_path else "None"
 
-# Top summary with ctive Dataset filename
+# Calculate confirmed active CISA KEV count
+kev_active_count = (
+    int((v_data["CISA KEV Status"] == "Confirmed - Active Exploitation").sum())
+    if tot > 0 and "CISA KEV Status" in v_data.columns
+    else 0
+)
+
+active_filename = os.path.basename(input_path) if input_path else "None"
+
+# Top summary bar with Active Dataset filename and CISA KEV alert count
 st.markdown(
     f"**Total Active Detections:** {tot:,} &nbsp;|&nbsp; "
     f"**Unique 2026 CVEs:** {count_2026_unique:,} &nbsp;|&nbsp; "
+    f"**Active KEV Exploits:** <span style='color: #D9534F; font-weight: 700;'>{kev_active_count:,}</span> &nbsp;|&nbsp; "
     f"**Active Dataset:** <span style='font-size: 1.15rem; font-weight: 700; color: #09AB3B;'>{active_filename}</span>",
     unsafe_allow_html=True,
 )
+
 
 active_df = None
 for var_val in list(locals().values()):
@@ -313,7 +324,8 @@ if active_df is not None and not active_df.empty:
         top_asset_group, top_exposure = stacked.idxmax()
         top_value = int(stacked.max())
 
-        with st.container(border=True):
+        # Match container height with the left heatmap (height=210)
+        with st.container(border=True, height=210):
             st.markdown(":blue-background[**EXPOSURE & IMPACT**] **Asset Criticality**")
             st.markdown(f"**{top_value:,} Critical** in {top_asset_group} ({top_exposure})")
             if st.button(
@@ -329,7 +341,8 @@ if active_df is not None and not active_df.empty:
         low_diff_count = int((active_df["Patch complexity"].str.lower() == "low").sum())
         low_diff_pct = round((low_diff_count / len(active_df)) * 100)
 
-        with st.container(border=True):
+        # Match container height with the left heatmap (height=210)
+        with st.container(border=True, height=210):
             st.markdown(":orange-background[**REMEDIATION EFFORT**] **Patch Difficulty**")
             st.markdown(f"**{low_diff_count} Quick Wins** ({low_diff_pct}% Low complexity)")
             if st.button(
@@ -339,6 +352,7 @@ if active_df is not None and not active_df.empty:
                 use_container_width=True
             ):
                 st.switch_page(os.path.join(current_dir, "01_Patch_Difficulty.py"))
+
 
     # --- Compact Remediation Insight Banner ---
     top_pct = 10
@@ -415,24 +429,23 @@ for col, (label, opt_key, level_col) in zip(m_cols, metric_perspectives):
                 crit_diff = f"{crit_cnt - base_crit:+d} vs CVSS"
                 high_diff = f"{high_cnt - base_high_crit:+d} vs CVSS"
 
-            # Side-by-side compact HTML metrics inside each card to prevent vertical scrolling
-            st.markdown(
-                f"""
-                <div style="display: flex; justify-content: space-between; margin-top: 6px;">
-                    <div>
-                        <div style="font-size: 0.75rem; color: #666;">Critical</div>
-                        <div style="font-size: 1.35rem; font-weight: 700; line-height: 1.2;">{crit_cnt:,}</div>
-                        <div style="font-size: 0.7rem; color: #FF8C00;">{crit_diff}</div>
-                    </div>
-                    <div>
-                        <div style="font-size: 0.75rem; color: #666;">High + Critical</div>
-                        <div style="font-size: 1.35rem; font-weight: 700; line-height: 1.2;">{high_cnt:,}</div>
-                        <div style="font-size: 0.7rem; color: #FF8C00;">{high_diff}</div>
-                    </div>
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
+
+    st.markdown(
+        """
+        <style>
+            .block-container { padding-top: 1.5rem; padding-bottom: 1rem; }
+            div[data-testid="stVerticalBlock"] > div { gap: 0.5rem; }
+            
+            /* Pin the action button to the bottom of fixed-height bordered cards */
+            div[data-testid="stVerticalBlockBorderWrapper"] > div > div[data-testid="stVerticalBlock"] {
+                height: 100%;
+                justify-content: space-between;
+            }
+        </style>
+        """,
+        unsafe_allow_html=True
+    )
+
 
 
 col1, col2, col3 = st.columns(3)
@@ -480,6 +493,18 @@ with col3:
         if is_dyn:
             active_opt = st.session_state.active_taxonomy[-1]
             level_col = f"Risk_Level_Option_{active_opt}"
+            
+            # Format active taxonomy weights concisely to fit on a single line
+            opt_map = taxonomy_mappings.get(active_opt, {})
+            short_labels = {
+                "internet-facing": "Internet",
+                "restricted / segmented": "Restricted",
+                "internal": "Internal",
+            }
+            sorted_weights = sorted(opt_map.items(), key=lambda x: x[1], reverse=True)
+            weight_summary = " > ".join(
+                [f"{short_labels.get(k, k.title())}: {v}x" for k, v in sorted_weights]
+            )
         else:
             # Derive standard CVSS severity bands when CVSS Only is active
             v_data["CVSS_Severity_Band"] = pd.cut(
@@ -488,6 +513,8 @@ with col3:
                 labels=["Low", "Medium", "High", "Critical"],
             )
             level_col = "CVSS_Severity_Band"
+            weight_summary = "Raw CVSS (No multiplier)"
+
 
         chart_title = f"Count by Risk Level ({active_label})"
 
@@ -512,11 +539,14 @@ with col3:
                 color_discrete_map=color_map,
             )
             fig.update_traces(textinfo="value", textposition="inside")
-            st.plotly_chart(fig, width="stretch")
+            st.plotly_chart(fig, use_container_width=True)
+            # Display active weight ratio beneath the chart for immediate context
+            st.caption(f"**Applied Weights:** `{weight_summary}`")
         else:
             st.warning("Risk level calculation column is missing.")
     else:
         st.warning("No risk level data available.")
+
 st.markdown(
     """
 <style>
