@@ -101,8 +101,10 @@ def load_compiled_model_data():
 
 
 @st.cache_data(show_spinner=False)
-def cached_score_data(data, weights, mappings, scoring_config, kev_catalog):
+def cached_score_data(data, weights, mappings, scoring_config, kev_catalog, use_nvd=True):
     return score_dataset(data, weights, mappings, scoring_config, kev_catalog)
+
+use_nvd_scores = False
 
 
 # if "active_taxonomy" not in st.session_state:
@@ -134,8 +136,12 @@ kev_notice = catalog_warning(kev_catalog)
 nvd_json_path = os.path.join(P_DIR, "outputs", "nvd_validated_scores.json")
 nvd_meta = None
 nvd_applied_count = 0
+use_nvd_scores = False
+raw_v_data = v_data.copy() 
+
 
 if os.path.exists(nvd_json_path) and not v_data.empty:
+    
     try:
         with open(nvd_json_path, "r", encoding="utf-8") as nvd_file:
             nvd_meta = json.load(nvd_file)
@@ -154,9 +160,21 @@ if os.path.exists(nvd_json_path) and not v_data.empty:
                 normalized_cves = v_data["CVE ID"].astype(str).str.strip().str.upper()
                 mapped_scores = normalized_cves.map(score_map)
                 nvd_applied_count = int(mapped_scores.notna().sum())
+                
                 v_data["CVSS base score"] = mapped_scores.fillna(
                     v_data["CVSS base score"]
+                    
                 )
+
+
+                # old_scores = pd.to_numeric(v_data["CVSS base score"], errors="coerce")
+                # new_scores = mapped_scores.fillna(old_scores)
+                # changed = int((old_scores != new_scores).sum())
+
+                # v_data["CVSS base score"] = new_scores
+                # st.info(f"matched CVE: {nvd_applied_count} | changed rows: {changed}")
+
+                
     except (OSError, json.JSONDecodeError):
         nvd_meta = None
 
@@ -171,8 +189,11 @@ if not v_data.empty:
         option: get_matrix_config(option)[1] for option in "ABC"
     }
     v_data, scoring_quality, option_a_exposure = cached_score_data(
-        v_data, weight_dict, taxonomy_mappings, scoring_config, kev_catalog
+        v_data, weight_dict, taxonomy_mappings, scoring_config, kev_catalog, use_nvd_scores
     )
+
+
+
     dimension_quality = scoring_quality["dimension"]
     exposure_quality = scoring_quality["exposure"]
     if dimension_quality["controls_unmatched_count"]:

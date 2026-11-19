@@ -33,3 +33,4 @@ inspect_xml.py
 pipeline_greenbone_nvd.py
 run_nvd.py
 scripts/sensitivity.py
+check_deps.py

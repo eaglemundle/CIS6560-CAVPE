@@ -1,6 +1,6 @@
 {
   "_dead_zone_notice": "DEAD ZONE: Modifying this registry or active_default_taxonomy directly impacts risk scoring across the Main Dashboard, Excel exports, and all downstream evaluation pages.",
-  "active_default_taxonomy": "Option B",
+  "active_default_taxonomy": "Option C",
   "registered_taxonomies": [
     {
       "id": "A",

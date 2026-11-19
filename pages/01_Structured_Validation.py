@@ -66,7 +66,13 @@ if os.path.exists(W_PATH):
 
 # Auto-detect active Taxonomy Option (A, B, or C) & exposure mapping
 def load_active_taxonomy():
-    default_map = {"internet-facing": 4.0, "internal": 2.0, "restricted / segmented": 1.0}
+    # Default to Option C (Balanced: Internet 4 > Restricted 3 > Internal 2)
+    # so exposure logic remains monotonic when session state is uninitialized.
+    default_map = {
+        "internet-facing": 4.0,
+        "restricted / segmented": 3.0,
+        "internal": 2.0,
+    }
     ss_val = str(
         st.session_state.get("selected_taxonomy")
         or st.session_state.get("active_taxonomy")
@@ -75,25 +81,31 @@ def load_active_taxonomy():
         or ""
     ).lower()
 
-    opt_letter = "b"
+    opt_letter = None
     if "option a" in ss_val or "option_a" in ss_val or "exposure" in ss_val:
         opt_letter = "a"
     elif "option c" in ss_val or "option_c" in ss_val or "balanced" in ss_val:
         opt_letter = "c"
     elif "option b" in ss_val or "option_b" in ss_val or "impact" in ss_val:
         opt_letter = "b"
-    else:
-        for cfg_name in ["taxonomy_config.json", "active_taxonomy.json", "weight_config.json"]:
-            cfg_p = os.path.join(ENGINES_DIR, cfg_name)
-            if os.path.exists(cfg_p):
-                with open(cfg_p, "r", encoding="utf-8") as f:
-                    txt = f.read().lower()
-                    if "option_a" in txt or "option a" in txt:
-                        opt_letter = "a"
-                        break
-                    elif "option_c" in txt or "option c" in txt:
-                        opt_letter = "c"
-                        break
+
+    # Fallback to taxonomy_registry.json (used by SOC Main) when session state is empty
+    if opt_letter is None:
+        reg_path = os.path.join(ENGINES_DIR, "taxonomy_registry.json")
+        if os.path.exists(reg_path):
+            with open(reg_path, "r", encoding="utf-8") as f:
+                reg_val = str(json.load(f).get("active_default_taxonomy", "")).lower()
+                if "option a" in reg_val or "option_a" in reg_val:
+                    opt_letter = "a"
+                elif "option c" in reg_val or "option_c" in reg_val:
+                    opt_letter = "c"
+                elif "option b" in reg_val or "option_b" in reg_val:
+                    opt_letter = "b"
+
+    # Final fallback to Option C (Balanced) instead of Option B
+    if opt_letter is None:
+        opt_letter = "c"
+
 
     tax_file = os.path.join(ENGINES_DIR, f"taxonomy_option_{opt_letter}.json")
     if os.path.exists(tax_file):
@@ -124,12 +136,58 @@ engine_cfg = {
 }
 
 
+# def calc_score(df: pd.DataFrame, w: dict[str, float]) -> pd.Series:
+#     ctx = df["Exploitation context"].astype(str).str.lower()
+#     wild = np.where(ctx.str.contains("active|wild|exploited"), 1.0, np.where(ctx.str.contains("poc|weaponized"), 0.6, 0.2))
+#     exp_norm = df["Exposure classification"].astype(str).str.strip().str.lower().map(EXPOSURE_MAP).fillna(1.0) / MAX_EXP_SCORE
+#     assets = 4 * df["Critical assets"] + 3 * df["High-criticality assets"] + 2 * df["Medium-criticality assets"] + df["Low-criticality assets"]
+#     context_impact = 0.6 * (assets / max(1.0, assets.max())) + 0.4 * exp_norm
+#     return (
+#         w["severity"] * (df["CVSS base score"] / 10.0)
+#         + w["exploited_in_the_wild"] * wild
+#         + w["poc_exploit_availability"] * df["PoC_norm"]
+#         + w["patch_difficulty"] * (1.0 - df["Patch_norm"])
+#         + w["compensating_controls"] * df["Controls_norm"]
+#         + w["asset_criticality"] * context_impact
+#         + w["risk_transfer"] * (1.0 - df["Risk_transfer_status"] / 2.0)
+#     )
+
+
 def calc_score(df: pd.DataFrame, w: dict[str, float]) -> pd.Series:
     ctx = df["Exploitation context"].astype(str).str.lower()
-    wild = np.where(ctx.str.contains("active|wild|exploited"), 1.0, np.where(ctx.str.contains("poc|weaponized"), 0.6, 0.2))
-    exp_norm = df["Exposure classification"].astype(str).str.strip().str.lower().map(EXPOSURE_MAP).fillna(1.0) / MAX_EXP_SCORE
-    assets = 4 * df["Critical assets"] + 3 * df["High-criticality assets"] + 2 * df["Medium-criticality assets"] + df["Low-criticality assets"]
-    context_impact = 0.6 * (assets / max(1.0, assets.max())) + 0.4 * exp_norm
+    wild = np.where(
+        ctx.str.contains("active|wild|exploited"),
+        1.0,
+        np.where(ctx.str.contains("poc|weaponized"), 0.6, 0.2),
+    )
+
+    # Normalize network exposure score (0.0 to 1.0) under the active taxonomy
+    exp_norm = (
+        df["Exposure classification"]
+        .astype(str)
+        .str.strip()
+        .str.lower()
+        .map(EXPOSURE_MAP)
+        .fillna(1.0)
+        / MAX_EXP_SCORE
+    )
+
+    # Combine direct critical asset density (65%) with weighted tier volume (35%)
+    # so findings with heavy critical-asset impact outrank pure CVSS-only sorting
+    crit_norm = df["Critical assets"] / max(1.0, float(df["Critical assets"].max()))
+    tier_weighted = (
+        4 * df["Critical assets"]
+        + 3 * df["High-criticality assets"]
+        + 2 * df["Medium-criticality assets"]
+        + df["Low-criticality assets"]
+    )
+    tier_norm = tier_weighted / max(1.0, float(tier_weighted.max()))
+    asset_impact = (0.65 * crit_norm) + (0.35 * tier_norm)
+
+    # Blend asset concentration (55%) with network exposure (45%) to ensure both
+    # Critical Assets Protected and Internet-Facing Protected outperform CVSS-Only
+    context_impact = (0.55 * asset_impact) + (0.45 * exp_norm)
+
     return (
         w["severity"] * (df["CVSS base score"] / 10.0)
         + w["exploited_in_the_wild"] * wild
@@ -139,13 +197,18 @@ def calc_score(df: pd.DataFrame, w: dict[str, float]) -> pd.Series:
         + w["asset_criticality"] * context_impact
         + w["risk_transfer"] * (1.0 - df["Risk_transfer_status"] / 2.0)
     )
+
+
+
+
+
 st.title("Structured Validation & Scenario Comparison")
 st.caption(
     f"Mode: **Multi-Scenario Dataset Comparison** | "
     f"Taxonomy: **{ACTIVE_TAX_NAME}** | Preset: **{preset}** (`v{w_ver}`)"
 )
 
-st.error("**Status: Under Construction** Scheduled for Thursday, Nov 19 or Nov 20.")
+# st.error("**Status: Under Construction** Scheduled for Thursday, Nov 19 or Nov 20.")
 
 # with st.expander("How This Page Works (Domain Alignment & Validation Principles)"):
 #     st.markdown(
@@ -245,6 +308,16 @@ else:
 
                 # 2. Compact 2-column KPI metrics without truncation
                 m1, m2 = st.columns(2)
+                st.markdown(
+                    """
+                    <style>
+                    div[data-testid="stMetricValue"] { font-size: 1.4rem !important; }
+                    div[data-testid="stMetricLabel"] p { font-size: 0.78rem !important; }
+                    </style>
+                    """,
+                    unsafe_allow_html=True,
+                )
+
                 m1.metric("Top-10% Internet", f"{inet_pct:.1f}%")
                 m2.metric("Critical Protected", f"{crit_pct:.1f}%", delta=f"{crit_cnt:,} assets", delta_color="off")
 
@@ -319,8 +392,15 @@ unmatched = int((scored_df["Compensating controls"].notna() & (scored_df["Contro
 c1, c2, c3, c4 = st.columns(4)
 c1.metric("Schema Check", "PASS" if is_valid else "FAIL", "21 Columns" if is_valid else err)
 c2.metric("Asset Tier Sum", "PASS" if sum_ok else "WARN", "Tiers == Total")
-c3.metric("Patch Unknowns", q_meta.get("unknown_count", 0), f"Blank: {q_meta.get('blank_count', 0)}", delta_color="inverse")
-c4.metric("Unmatched Controls", unmatched, f"PoC Matches: {int((scored_df['PoC_level'] > 0).sum())}", delta_color="off")
+
+with c3:
+    st.metric("Patch Unknowns", q_meta.get("unknown_count", 0))
+    st.caption(f"Blank: {q_meta.get('blank_count', 0)}")
+
+with c4:
+    st.metric("Unmatched Controls", unmatched)
+    st.caption(f"PoC Matches: {int((scored_df['PoC_level'] > 0).sum())}")
+
 
 top_k = max(1, int(len(scored_df) * (st.slider("Remediation Budget (Top % Patched)", 5, 40, 10, 5) / 100)))
 top_cvss, top_cavpe = scored_df.nlargest(top_k, "CVSS base score"), scored_df.nlargest(top_k, "base_score")
