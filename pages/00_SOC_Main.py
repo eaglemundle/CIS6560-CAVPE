@@ -105,8 +105,20 @@ def cached_score_data(data, weights, mappings, scoring_config, kev_catalog):
     return score_dataset(data, weights, mappings, scoring_config, kev_catalog)
 
 
+# if "active_taxonomy" not in st.session_state:
+#     st.session_state.active_taxonomy = "Option B"
+
+
+TAX_CONF = os.path.join(P_DIR, "engines", "taxonomy_registry.json")  
+
+def get_default_taxonomy():
+    if os.path.exists(TAX_CONF):
+        with open(TAX_CONF, "r", encoding="utf-8") as f:
+            return json.load(f).get("active_default_taxonomy", "Option B")
+    return "Option B"
+
 if "active_taxonomy" not in st.session_state:
-    st.session_state.active_taxonomy = "Option B"
+    st.session_state.active_taxonomy = get_default_taxonomy()
 
 
 # 5. Main Dashboard Header View Layout

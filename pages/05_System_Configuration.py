@@ -199,3 +199,67 @@ with st.expander("Configuration Version History", expanded=bool(history)):
         st.caption("No version changes recorded yet (Baseline v1.0.0).")
 
 st.write(f"**NVD Authorized Token Active:** `{'Yes (Key Detected)' if API_KEY else 'No (Anonymized Request Constraints Apply)'}`")
+
+# --- Taxonomy Registry & Default Perspective Management ---
+TAXONOMY_REGISTRY_PATH = os.path.join(ROOT_DIR, "engines", "taxonomy_registry.json")
+
+st.markdown("---")
+st.subheader("Default Risk Taxonomy Configuration")
+
+if os.path.exists(TAXONOMY_REGISTRY_PATH):
+    try:
+        with open(TAXONOMY_REGISTRY_PATH, "r", encoding="utf-8") as f:
+            tax_registry = json.load(f)
+
+        registered_list = tax_registry.get("registered_taxonomies", [])
+        current_default_key = tax_registry.get("active_default_taxonomy", "Option B")
+
+        if registered_list:
+            # system_key -> option_name 매핑 생성
+            key_to_label = {
+                item["system_key"]: item["option_name"] for item in registered_list
+            }
+            system_keys = list(key_to_label.keys())
+
+            default_index = (
+                system_keys.index(current_default_key)
+                if current_default_key in system_keys
+                else 0
+            )
+
+            selected_tax_key = st.selectbox(
+                "Select Default Active Taxonomy Perspective",
+                options=system_keys,
+                index=default_index,
+                format_func=lambda k: key_to_label.get(k, k),
+                help="This perspective will be loaded by default when opening the SOC Main Dashboard.",
+            )
+
+            col_save, col_info = st.columns([1, 3], vertical_alignment="center")
+            with col_save:
+                if st.button("Save Default Taxonomy", type="primary", use_container_width=True):
+                    tax_registry["active_default_taxonomy"] = selected_tax_key
+                    with open(TAXONOMY_REGISTRY_PATH, "w", encoding="utf-8") as f:
+                        json.dump(tax_registry, f, indent=2, ensure_ascii=False)
+
+                    # 현재 열려있는 세션의 대시보드 기본값도 즉시 동기화
+                    st.session_state.active_taxonomy = selected_tax_key
+                    st.success(f"Default taxonomy updated to: `{key_to_label[selected_tax_key]}`")
+                    st.rerun()
+
+            with col_info:
+                st.caption(f"Current saved default: **{key_to_label.get(current_default_key, current_default_key)}**")
+
+            with st.expander("View Registered Taxonomies (`taxonomy_registry.json`)"):
+                st.dataframe(
+                    pd.DataFrame(registered_list),
+                    hide_index=True,
+                    use_container_width=True,
+                )
+        else:
+            st.warning("No registered taxonomies found in `taxonomy_registry.json`.")
+
+    except (OSError, json.JSONDecodeError) as e:
+        st.error(f"Error reading `taxonomy_registry.json`: {e}")
+else:
+    st.warning(f"Registry file not found: `{TAXONOMY_REGISTRY_PATH}`")

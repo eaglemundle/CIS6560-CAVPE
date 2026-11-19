@@ -79,7 +79,7 @@ except Exception as e:
     st.error(f"Error loading active dataset (`{os.path.basename(EXCEL_FILE_PATH)}`): {e}")
 # --- 5. Top Status Card UI ---
 st.title("Asset Criticality & Validation Metrics Dashboard")
-st.warning("**Under Construction (Nov 17):** Asset Criticality scoring rules and categories are still being fine-tuned.")
+# st.warning("**Under Construction (Nov 17):** Asset Criticality scoring rules and categories are still being fine-tuned.")
 
 w_severity = weights_config.get("severity", 0.10)
 w_criticality = weights_config.get("asset_criticality", 0.10)
