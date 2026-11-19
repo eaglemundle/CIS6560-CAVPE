@@ -11,8 +11,10 @@ from app_utils.config_manager import (
     list_reference_datasets,
     REF_DATA_DIR,
     update_dataset_path,
+    update_default_taxonomy,
     get_version_history,
 )
+
 
 
 try:
@@ -29,6 +31,7 @@ EXCEL_FILE_PATH = get_active_dataset_path()
 COORDINATED_LEDGER_PATH = os.path.join(ROOT_DIR, "reference_data", "vulnerability_coordinated_ledger.xlsx")
 REMEDIATION_JSON_PATH = os.path.join(ROOT_DIR, "engines", "remediation_weights.json")
 WEIGHT_CONFIG_JSON_PATH = os.path.join(ROOT_DIR, "engines", "weight_config.json")
+TAXONOMY_REGISTRY_PATH = os.path.join(ROOT_DIR, "engines", "taxonomy_registry.json")
 
 # --- Load remediation mapping data directly from JSON ---
 with open(REMEDIATION_JSON_PATH, "r", encoding="utf-8") as f:
@@ -45,6 +48,39 @@ with open(WEIGHT_CONFIG_JSON_PATH, "r", encoding="utf-8") as f:
 raw_risk_data = risk_data
 weights_config = risk_data["weights"]
 selected_preset = risk_data["selected_preset"]
+
+
+@st.cache_data(show_spinner=False)
+def detect_impacted_files(root_dir):
+    """Scan active project Python files that reference taxonomy_registry or active_taxonomy."""
+    impacted = []
+    keywords = ("taxonomy_registry.json", "active_taxonomy")
+    ignore_dirs = {
+        ".git",
+        "__pycache__",
+        ".venv",
+        "venv",
+        "env",
+        ".pytest_cache",
+        "obsolete",
+    }
+
+    for dirpath, dirnames, filenames in os.walk(root_dir):
+        # Prune ignored directories (including obsolete/) in-place
+        dirnames[:] = [d for d in dirnames if d.lower() not in ignore_dirs]
+        for fname in sorted(filenames):
+            if fname.endswith(".py"):
+                fpath = os.path.join(dirpath, fname)
+                try:
+                    with open(fpath, "r", encoding="utf-8") as f:
+                        content = f.read()
+                    if any(kw in content for kw in keywords):
+                        rel_path = os.path.relpath(fpath, root_dir).replace("\\", "/")
+                        impacted.append(rel_path)
+                except OSError:
+                    continue
+    return impacted
+
 
 # --- Load Excel/CSV datasets ---
 if (
@@ -71,7 +107,6 @@ elif os.path.exists(COORDINATED_LEDGER_PATH):
 
 
 # --- Active Dataset Status & Schema Health ---
-
 current_dataset_path = get_active_dataset_path()
 
 st.subheader("Active Dataset Status")
@@ -189,20 +224,7 @@ with tab_manual:
             else:
                 st.error(f"Path update rejected — {err}")
 
-# --- Version History Log ---
-st.markdown("---")
-history = get_version_history()
-with st.expander("Configuration Version History", expanded=bool(history)):
-    if history:
-        st.dataframe(pd.DataFrame(history), hide_index=True, use_container_width=True)
-    else:
-        st.caption("No version changes recorded yet (Baseline v1.0.0).")
-
-st.write(f"**NVD Authorized Token Active:** `{'Yes (Key Detected)' if API_KEY else 'No (Anonymized Request Constraints Apply)'}`")
-
 # --- Taxonomy Registry & Default Perspective Management ---
-TAXONOMY_REGISTRY_PATH = os.path.join(ROOT_DIR, "engines", "taxonomy_registry.json")
-
 st.markdown("---")
 st.subheader("Default Risk Taxonomy Configuration")
 
@@ -211,16 +233,65 @@ if os.path.exists(TAXONOMY_REGISTRY_PATH):
         with open(TAXONOMY_REGISTRY_PATH, "r", encoding="utf-8") as f:
             tax_registry = json.load(f)
 
+        # Render high-contrast Dead Zone alert banner with dynamically scanned file references
+        dead_zone_msg = tax_registry.get("_dead_zone_notice")
+        impacted_files = detect_impacted_files(ROOT_DIR)
+
+        if dead_zone_msg:
+            if impacted_files:
+                scope_items_html = "".join(
+                    [f"<li><code>{path}</code></li>" for path in impacted_files]
+                )
+            else:
+                scope_items_html = "<li>No direct file references detected.</li>"
+
+            st.markdown(
+                f"""
+                <div style="
+                    background-color: #FFF0F0;
+                    border: 1px solid #D32F2F;
+                    border-left: 6px solid #B71C1C;
+                    border-radius: 6px;
+                    padding: 14px 18px;
+                    margin-bottom: 14px;
+                    color: #212121;
+                ">
+                    <div style="
+                        display: inline-block;
+                        background-color: #B71C1C;
+                        color: #FFFFFF;
+                        font-size: 0.75rem;
+                        font-weight: 700;
+                        padding: 2px 8px;
+                        border-radius: 4px;
+                        letter-spacing: 0.05em;
+                        margin-bottom: 8px;
+                    ">
+                        SYSTEM DEAD ZONE · CRITICAL IMPACT
+                    </div>
+                    <div style="font-size: 0.92rem; font-weight: 600; color: #7F0000; margin-bottom: 8px;">
+                        {dead_zone_msg}
+                    </div>
+                    <div style="font-size: 0.85rem; font-weight: 600; color: #424242;">
+                        Detected Referencing Files:
+                    </div>
+                    <ul style="margin: 4px 0 0 18px; padding: 0; font-size: 0.85rem; color: #333333;">
+                        {scope_items_html}
+                    </ul>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
         registered_list = tax_registry.get("registered_taxonomies", [])
-        current_default_key = tax_registry.get("active_default_taxonomy", "Option B")
+        current_default_key = tax_registry.get("active_default_taxonomy", "Option C")
 
         if registered_list:
-            # system_key -> option_name 매핑 생성
+            # Map system keys to display option names
             key_to_label = {
                 item["system_key"]: item["option_name"] for item in registered_list
             }
             system_keys = list(key_to_label.keys())
-
             default_index = (
                 system_keys.index(current_default_key)
                 if current_default_key in system_keys
@@ -232,34 +303,36 @@ if os.path.exists(TAXONOMY_REGISTRY_PATH):
                 options=system_keys,
                 index=default_index,
                 format_func=lambda k: key_to_label.get(k, k),
-                help="This perspective will be loaded by default when opening the SOC Main Dashboard.",
             )
 
-            col_save, col_info = st.columns([1, 3], vertical_alignment="center")
-            with col_save:
-                if st.button("Save Default Taxonomy", type="primary", use_container_width=True):
-                    tax_registry["active_default_taxonomy"] = selected_tax_key
-                    with open(TAXONOMY_REGISTRY_PATH, "w", encoding="utf-8") as f:
-                        json.dump(tax_registry, f, indent=2, ensure_ascii=False)
-
-                    # 현재 열려있는 세션의 대시보드 기본값도 즉시 동기화
+            if st.button("Save Default Taxonomy", type="primary"):
+                ok, err = update_default_taxonomy(
+                    selected_tax_key,
+                    TAXONOMY_REGISTRY_PATH,
+                    note=f"Default taxonomy set to {key_to_label[selected_tax_key]}",
+                    changed_by=operator_name,
+                )
+                if ok:
+                    # Synchronize current active session state immediately
                     st.session_state.active_taxonomy = selected_tax_key
                     st.success(f"Default taxonomy updated to: `{key_to_label[selected_tax_key]}`")
                     st.rerun()
+                else:
+                    st.error(f"Failed to update default taxonomy: {err}")
 
-            with col_info:
-                st.caption(f"Current saved default: **{key_to_label.get(current_default_key, current_default_key)}**")
-
-            with st.expander("View Registered Taxonomies (`taxonomy_registry.json`)"):
-                st.dataframe(
-                    pd.DataFrame(registered_list),
-                    hide_index=True,
-                    use_container_width=True,
-                )
-        else:
-            st.warning("No registered taxonomies found in `taxonomy_registry.json`.")
 
     except (OSError, json.JSONDecodeError) as e:
         st.error(f"Error reading `taxonomy_registry.json`: {e}")
 else:
     st.warning(f"Registry file not found: `{TAXONOMY_REGISTRY_PATH}`")
+
+# --- Version History Log ---
+st.markdown("---")
+history = get_version_history()
+with st.expander("Configuration Version History", expanded=bool(history)):
+    if history:
+        st.dataframe(pd.DataFrame(history), hide_index=True, use_container_width=True)
+    else:
+        st.caption("No version changes recorded yet (Baseline v1.0.0).")
+
+st.write(f"**NVD Authorized Token Active:** `{'Yes (Key Detected)' if API_KEY else 'No (Anonymized Request Constraints Apply)'}`")

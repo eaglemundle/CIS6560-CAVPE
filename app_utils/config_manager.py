@@ -113,7 +113,23 @@ def get_last_updated_by() -> str:
 
 
 def get_version_history() -> list[dict]:
-    return load_config().get("version_history", [])
+    """Return normalized version history supporting both Dataset and Taxonomy changes."""
+    history = load_config().get("version_history", [])
+    normalized = []
+    for entry in history:
+        item = dict(entry)
+        # Backward compatibility for legacy entries using "Dataset" key
+        if "Dataset" in item and "Target" not in item:
+            legacy_val = item.pop("Dataset")
+            item["Target"] = f"Dataset: {legacy_val}" if legacy_val and legacy_val != "-" else "-"
+        normalized.append({
+            "Version": item.get("Version", ""),
+            "Timestamp": item.get("Timestamp", ""),
+            "Changed By": item.get("Changed By", ""),
+            "Target": item.get("Target", "-"),
+            "Note": item.get("Note", ""),
+        })
+    return normalized
 
 
 def reset_config_to_default() -> tuple[bool, str | None]:
@@ -215,7 +231,7 @@ def update_dataset_path(
         "Version": new_ver,
         "Timestamp": now_str,
         "Changed By": actor,
-        "Dataset": os.path.basename(abs_path),
+        "Target": f"Dataset: {os.path.basename(abs_path)}",
         "Note": note,
     })
     config_data["version_history"] = history[:10]
@@ -226,6 +242,65 @@ def update_dataset_path(
     return ok, err
 
 
+def update_default_taxonomy(
+    taxonomy_key: str,
+    registry_path: str,
+    note: str = "",
+    changed_by: str | None = None,
+) -> tuple[bool, str | None]:
+    """Update active_default_taxonomy in registry, bump config version, and log Name + IP."""
+    if not os.path.exists(registry_path):
+        return False, f"Registry file not found: {registry_path}"
+
+    try:
+        with open(registry_path, "r", encoding="utf-8") as f:
+            registry = json.load(f)
+
+        valid_keys = [
+            item.get("system_key") for item in registry.get("registered_taxonomies", [])
+        ]
+        if taxonomy_key not in valid_keys:
+            return False, f"Invalid taxonomy key: {taxonomy_key}"
+
+        prev_key = registry.get("active_default_taxonomy", "Unknown")
+        registry["active_default_taxonomy"] = taxonomy_key
+
+        with open(registry_path, "w", encoding="utf-8") as f:
+            json.dump(registry, f, indent=2, ensure_ascii=False)
+
+        config_data = load_config()
+        current_ver = config_data.get("config_version", "v1.0.0")
+        new_ver = _increment_version(current_ver, "patch") if taxonomy_key != prev_key else current_ver
+
+        client_ip = _get_client_ip()
+        manual_name = (changed_by or st.session_state.get("current_user") or "").strip()
+        if manual_name:
+            st.session_state["current_user"] = manual_name
+            actor = f"{manual_name} (IP: {client_ip})"
+        else:
+            actor = f"IP: {client_ip}"
+
+        now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+        config_data["config_version"] = new_ver
+        config_data["last_updated"] = now_str
+        config_data["last_updated_by"] = actor
+
+        history = config_data.get("version_history", [])
+        history.insert(0, {
+            "Version": new_ver,
+            "Timestamp": now_str,
+            "Changed By": actor,
+            "Target": f"Taxonomy: {taxonomy_key}",
+            "Note": note or f"Default taxonomy changed ({prev_key} -> {taxonomy_key})",
+        })
+        config_data["version_history"] = history[:10]
+
+        return save_config(config_data)
+    except (OSError, json.JSONDecodeError) as e:
+        return False, str(e)
+
+
 def list_reference_datasets() -> list[str]:
     if not os.path.exists(REF_DATA_DIR):
         return []
@@ -233,35 +308,3 @@ def list_reference_datasets() -> list[str]:
         f for f in os.listdir(REF_DATA_DIR)
         if f.endswith((".xlsx", ".xls", ".csv")) and not f.startswith("~$")
     ])
-
-
-@st.cache_data(show_spinner="Loading dataset...")
-def _read_file_cached(file_path: str, mtime: float) -> pd.DataFrame:
-    if file_path.lower().endswith(".csv"):
-        return pd.read_csv(file_path)
-    return pd.read_excel(file_path)
-
-
-def load_active_dataset(validate: bool = True) -> pd.DataFrame:
-    file_path = get_active_dataset_path()
-    if not os.path.exists(file_path):
-        raise FileNotFoundError(f"Dataset file not found: {file_path}")
-
-    mtime = os.path.getmtime(file_path)
-    df = _read_file_cached(file_path, mtime)
-
-    if validate:
-        is_valid, missing_cols = validate_dataset_schema(df)
-        if not is_valid:
-            raise ValueError(f"Dataset schema validation failed. Missing columns: {', '.join(missing_cols)}")
-
-    return df
-
-
-def get_nvd_api_key() -> str:
-    try:
-        if "NVD_API_KEY" in st.secrets:
-            return str(st.secrets["NVD_API_KEY"]).strip()
-    except Exception:
-        pass
-    return os.getenv("NVD_API_KEY", "").strip()

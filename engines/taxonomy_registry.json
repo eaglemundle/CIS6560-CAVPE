@@ -1,23 +1,27 @@
 {
+  "_dead_zone_notice": "DEAD ZONE: Modifying this registry or active_default_taxonomy directly impacts risk scoring across the Main Dashboard, Excel exports, and all downstream evaluation pages.",
   "active_default_taxonomy": "Option C",
   "registered_taxonomies": [
     {
       "id": "A",
       "system_key": "Option A",
       "option_name": "Option A (Traditional Security / Exposure-Centric)",
-      "filename": "taxonomy_option_a.json"
+      "filename": "taxonomy_option_a.json",
+      "is_dead_zone": true
     },
     {
       "id": "B",
       "system_key": "Option B",
       "option_name": "Option B (Business Impact-Centric)",
-      "filename": "taxonomy_option_b.json"
+      "filename": "taxonomy_option_b.json",
+      "is_dead_zone": true
     },
     {
       "id": "C",
       "system_key": "Option C",
       "option_name": "Option C (Hybrid / Mitigating Controls-Centric)",
-      "filename": "taxonomy_option_c.json"
+      "filename": "taxonomy_option_c.json",
+      "is_dead_zone": true
     }
   ]
 }
