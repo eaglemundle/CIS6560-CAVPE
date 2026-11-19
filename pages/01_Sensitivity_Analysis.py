@@ -148,12 +148,18 @@ def calc_score(df: pd.DataFrame, w: dict[str, float]) -> pd.Series:
 
 import plotly.express as px
 
-st.title("Sensitivity Analysis (Weight Config History & Score Delta)")
+st.markdown(
+    "# Sensitivity Analysis<br>"
+    "<span style='font-size: 0.6em; font-weight: 500; color: #64748B;'>"
+    "(Weight Config History & Score Delta)"
+    "</span>",
+    unsafe_allow_html=True,
+)
+
 st.caption(
     f"Dataset: **{os.path.basename(EXCEL_PATH)}** (`{get_config_version()}`) | "
     f"Taxonomy: **{ACTIVE_TAX_NAME}** | Current Preset: **{preset}** (`v{w_ver}`)"
 )
-st.warning("**Status: Under Active Development** — Additional refinements and metric calibrations are scheduled for Wednesday, Nov 18.")
 
 with st.expander("How This Page Works (Weight History & Stability Principles)"):
     st.markdown(
@@ -208,27 +214,52 @@ c_left, c_right = st.columns((52, 48), vertical_alignment="top")
 
 with c_left:
     with st.container(border=True):
-        st.markdown("**1. Weight Allocation Across Logged Versions (%)**")
-        w_rows = []
-        for item in history_entries:
-            for k in DEFAULT_W:
-                w_rows.append({
-                    "Version": item["version"],
-                    "Factor": LABELS[k],
-                    "Share (%)": round(item["weights"][k] * 100, 1),
-                })
-        fig_hist_w = px.bar(
-            pd.DataFrame(w_rows), x="Version", y="Share (%)", color="Factor", barmode="stack", text_auto=True
+        st.markdown("**Weight Allocation Across Logged Versions (%)**")
+
+        # Keep baseline (first) + up to 5 most recent versions if history grows large
+        if len(history_entries) > 6:
+            display_entries = list(history_entries[:1]) + list(history_entries[-5:])
+        else:
+            display_entries = history_entries
+
+        transposed_rows = list()
+        for k in DEFAULT_W:
+            row = {"Factor": LABELS[k]}
+            for item in display_entries:
+                row[item["version"]] = f"{item['weights'][k] * 100:.0f}%"
+            transposed_rows.append(row)
+
+        df_weights_table = pd.DataFrame(transposed_rows)
+
+        # Highlight cells in orange where weight changed compared to the previous displayed version
+        def highlight_weight_changes(df: pd.DataFrame) -> pd.DataFrame:
+            styles = pd.DataFrame("", index=df.index, columns=df.columns)
+            ver_cols = [c for c in df.columns if c != "Factor"]
+            for i in range(1, len(ver_cols)):
+                prev_col = ver_cols[i - 1]
+                curr_col = ver_cols[i]
+                changed = df[curr_col] != df[prev_col]
+                styles.loc[changed, curr_col] = "color: #EA580C; font-weight: 700;"
+            return styles
+
+
+        styled_weights = df_weights_table.style.apply(highlight_weight_changes, axis=None)
+
+        st.dataframe(
+            styled_weights,
+            hide_index=True,
+            use_container_width=True,
+            height=290,
+            column_config={
+                "Factor": st.column_config.TextColumn("Factor", pinned=True)
+            },
         )
-        fig_hist_w.update_layout(
-            height=250, margin=dict(l=0, r=10, t=10, b=5),
-            xaxis_title="", legend=dict(orientation="h", y=1.18, x=0, title="")
-        )
-        st.plotly_chart(fig_hist_w, use_container_width=True)
+
+
 
 with c_right:
     with st.container(border=True):
-        st.markdown("**2. Rank Stability & Top-10% Retention vs. Earliest Log**")
+        st.markdown("**Rank Stability & Top-10% Retention vs. Earliest Log**")
         ref_scores = history_entries[0]["scores"]
         top_n = max(1, int(len(scored_df) * 0.10))
         ref_top_ids = set(scored_df.assign(s=ref_scores).nlargest(top_n, "s")["Finding ID"])
@@ -247,17 +278,25 @@ with c_right:
         stab_df = pd.DataFrame(stab_rows).melt(id_vars="Version", var_name="Metric", value_name="Score (%)")
         fig_stab = px.bar(
             stab_df, x="Version", y="Score (%)", color="Metric", barmode="group", text_auto=True,
-            color_discrete_sequence=["#64748B", "#2563EB"], range_y=(0, 110)
+            color_discrete_map={
+                "Rank Stability (%)": "#CBD5E1",       
+                "Top-10% Retention (%)": "#F97316",   
+            },
+            range_y=(0, 115),
         )
+
         fig_stab.update_layout(
-            height=250, margin=dict(l=0, r=10, t=10, b=5),
-            xaxis_title="", legend=dict(orientation="h", y=1.18, x=0, title="")
+            height=300,
+            margin=dict(l=0, r=10, t=55, b=5),
+            xaxis_title="",
+            legend=dict(orientation="h", yanchor="bottom", y=1.04, xanchor="left", x=0, title=""),
         )
         st.plotly_chart(fig_stab, use_container_width=True)
 
+
 # --- 3. Pairwise Version Comparison & Score Delta Distribution ---
 st.divider()
-st.subheader("3. Pairwise Version Score Delta Comparison")
+st.subheader("Pairwise Version Score Delta Comparison")
 
 labels_list = [item["label"] for item in history_entries]
 sel_c1, sel_c2 = st.columns(2)
@@ -278,11 +317,29 @@ with met_col:
     with st.container(border=True):
         m1, m2 = st.columns(2)
         m1.metric("Pairwise Rank Stability", f"{rho_pair:.4f}", delta="1.0 = Identical order", delta_color="off")
-        m2.metric("Top-10% Retention", f"{ret_pair:.1f}%", delta=f"{len(top_before & top_after)}/{top_n} kept", delta_color="off")
+        with m2:
+            st.markdown(
+                f"""
+                <div style="background-color: rgba(249, 115, 22, 0.10); border: 1.5px solid #F97316;
+                            border-radius: 8px; padding: 8px 12px;">
+                    <div style="font-size: 0.8rem; font-weight: 700; color: #EA580C;">
+                        Top-10% Retention
+                    </div>
+                    <div style="font-size: 1.75rem; font-weight: 700; color: #1E293B; line-height: 1.2;">
+                        {ret_pair:.1f}%
+                    </div>
+                    <div style="font-size: 0.78rem; color: #C2410C; font-weight: 600;">
+                        {len(top_before & top_after)}/{top_n} critical items kept
+                    </div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
         st.divider()
         m3, m4 = st.columns(2)
         m3.metric("Max Single Score Delta", f"±{scored_df['delta'].abs().max():.3f}")
-        m4.metric("Average |Score Delta|", f"{scored_df['delta'].abs().mean():.3f}")
+        m4.metric("Average |Score Delta", f"{scored_df['delta'].abs().mean():.3f}")
+
 
 with dist_col:
     with st.container(border=True):

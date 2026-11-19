@@ -1,12 +1,23 @@
 {
-  "last_updated": "2026-11-18 20:14:16",
-  "taxonomy_name": "CIS6560_Risk_Scoring_Weights",
+  "weights": {
+    "severity": 0.0,
+    "exploited_in_the_wild": 0.0,
+    "poc_exploit_availability": 0.0,
+    "patch_difficulty": 0.0,
+    "compensating_controls": 0.15,
+    "asset_criticality": 0.85,
+    "risk_transfer": 0.0
+  },
   "version": "2.0.6",
+  "taxonomy_name": "CIS6560_Risk_Scoring_Weights",
+  "selected_preset": "Custom Profile",
+  "last_updated": "2026-11-18 23:10:48",
   "version_history": [
     {
       "version": "v2.0.0",
       "selected_preset": "Charter Default",
-      "last_updated": "2026-11-16 23:38:16",
+      "last_updated": "2026-11-18 22:33:47",
+      "updated_by": "IP: 192.168.2.15",
       "weights": {
         "severity": 0.4,
         "exploited_in_the_wild": 0.15,
@@ -20,102 +31,93 @@
     {
       "version": "v2.0.1",
       "selected_preset": "Custom Profile",
-      "last_updated": "2026-11-17 02:35:26",
+      "last_updated": "2026-11-18 22:35:03",
+      "updated_by": "IP: 192.168.2.15",
       "weights": {
-        "severity": 0.4,
+        "severity": 0.3,
         "exploited_in_the_wild": 0.15,
         "poc_exploit_availability": 0.1,
-        "patch_difficulty": 0.13,
+        "patch_difficulty": 0.2,
         "compensating_controls": 0.1,
         "asset_criticality": 0.1,
-        "risk_transfer": 0.02
+        "risk_transfer": 0.05
       }
     },
     {
       "version": "v2.0.2",
       "selected_preset": "Custom Profile",
-      "last_updated": "2026-11-17 02:38:52",
+      "last_updated": "2026-11-18 22:35:44",
       "updated_by": "IP: 192.168.2.15",
       "weights": {
-        "severity": 0.4,
+        "severity": 0.5,
         "exploited_in_the_wild": 0.15,
         "poc_exploit_availability": 0.1,
-        "patch_difficulty": 0.13,
+        "patch_difficulty": 0.1,
         "compensating_controls": 0.1,
-        "asset_criticality": 0.1,
-        "risk_transfer": 0.02
+        "asset_criticality": 0.05,
+        "risk_transfer": 0.0
       }
     },
     {
       "version": "v2.0.3",
       "selected_preset": "Custom Profile",
-      "last_updated": "2026-11-18 20:10:50",
+      "last_updated": "2026-11-18 22:36:15",
       "updated_by": "IP: 192.168.2.15",
       "weights": {
-        "severity": 0.15,
-        "exploited_in_the_wild": 0.4,
+        "severity": 0.5,
+        "exploited_in_the_wild": 0.15,
         "poc_exploit_availability": 0.1,
-        "patch_difficulty": 0.13,
-        "compensating_controls": 0.1,
-        "asset_criticality": 0.1,
-        "risk_transfer": 0.02
+        "patch_difficulty": 0.0,
+        "compensating_controls": 0.2,
+        "asset_criticality": 0.05,
+        "risk_transfer": 0.0
       }
     },
     {
       "version": "v2.0.4",
       "selected_preset": "Custom Profile",
-      "last_updated": "2026-11-18 20:12:09",
+      "last_updated": "2026-11-18 23:09:17",
       "updated_by": "IP: 192.168.2.15",
       "weights": {
-        "severity": 0.4,
-        "exploited_in_the_wild": 0.15,
-        "poc_exploit_availability": 0.1,
-        "patch_difficulty": 0.13,
-        "compensating_controls": 0.1,
-        "asset_criticality": 0.1,
-        "risk_transfer": 0.02
+        "severity": 0.0,
+        "exploited_in_the_wild": 0.0,
+        "poc_exploit_availability": 0.0,
+        "patch_difficulty": 0.6,
+        "compensating_controls": 0.0,
+        "asset_criticality": 0.0,
+        "risk_transfer": 0.4
       }
     },
     {
       "version": "v2.0.5",
       "selected_preset": "Custom Profile",
-      "last_updated": "2026-11-18 20:14:13",
+      "last_updated": "2026-11-18 23:10:00",
       "updated_by": "IP: 192.168.2.15",
       "weights": {
-        "severity": 0.15,
-        "exploited_in_the_wild": 0.4,
-        "poc_exploit_availability": 0.1,
-        "patch_difficulty": 0.13,
-        "compensating_controls": 0.1,
-        "asset_criticality": 0.1,
-        "risk_transfer": 0.02
+        "severity": 0.0,
+        "exploited_in_the_wild": 0.7,
+        "poc_exploit_availability": 0.3,
+        "patch_difficulty": 0.0,
+        "compensating_controls": 0.0,
+        "asset_criticality": 0.0,
+        "risk_transfer": 0.0
       }
     },
     {
       "version": "v2.0.6",
       "selected_preset": "Custom Profile",
-      "last_updated": "2026-11-18 20:14:16",
+      "last_updated": "2026-11-18 23:10:48",
       "updated_by": "IP: 192.168.2.15",
       "weights": {
-        "severity": 0.15,
-        "exploited_in_the_wild": 0.4,
-        "poc_exploit_availability": 0.1,
-        "patch_difficulty": 0.13,
-        "compensating_controls": 0.1,
-        "asset_criticality": 0.1,
-        "risk_transfer": 0.02
+        "severity": 0.0,
+        "exploited_in_the_wild": 0.0,
+        "poc_exploit_availability": 0.0,
+        "patch_difficulty": 0.0,
+        "compensating_controls": 0.15,
+        "asset_criticality": 0.85,
+        "risk_transfer": 0.0
       }
     }
   ],
-  "weights": {
-    "severity": 0.15,
-    "exploited_in_the_wild": 0.4,
-    "poc_exploit_availability": 0.1,
-    "patch_difficulty": 0.13,
-    "compensating_controls": 0.1,
-    "asset_criticality": 0.1,
-    "risk_transfer": 0.02
-  },
-  "selected_preset": "Custom Profile",
   "last_updated_by": "IP: 192.168.2.15"
 }

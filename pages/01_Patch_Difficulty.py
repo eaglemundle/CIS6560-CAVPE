@@ -228,13 +228,13 @@ if st.session_state.get("df_coordinated_excel") is not None:
                 use_container_width=True
             )
 
-        st.markdown("---")
-        st.markdown("#### TEMP - Operational Workload Triage Summary")
+        # st.markdown("---")
+        # st.markdown("#### TEMP - Operational Workload Triage Summary")
 
-        st.error(
-            "**Critical Bottleneck:** 22 Very High items require roughly **44 man-weeks** of complex engineering effort "
-            "($22 \\text{ CVEs} \\times 2 \\text{ weeks median effort} = 44 \\text{ man-weeks}$) and carry steep service outage risks."
-        )
+        # st.error(
+        #     "**Critical Bottleneck:** 22 Very High items require roughly **44 man-weeks** of complex engineering effort "
+        #     "($22 \\text{ CVEs} \\times 2 \\text{ weeks median effort} = 44 \\text{ man-weeks}$) and carry steep service outage risks."
+        # )
 
         st.markdown("---")
         st.markdown("##### High-Friction Bottleneck Inspection Queue (Very High Items)")
