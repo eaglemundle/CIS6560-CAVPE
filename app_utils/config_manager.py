@@ -26,6 +26,40 @@ REQUIRED_COLUMNS = [
 os.makedirs(REF_DATA_DIR, exist_ok=True)
 os.makedirs(os.path.dirname(D_CONF), exist_ok=True)
 
+import os
+import streamlit as st
+
+def get_nvd_api_key():
+    # Streamlit Cloud Secrets
+    if "NVD_API_KEY" in st.secrets:
+        return st.secrets["NVD_API_KEY"]
+    return os.environ.get("NVD_API_KEY")
+
+
+@st.cache_data(show_spinner="Loading dataset...")
+def _read_file_cached(file_path: str, mtime: float) -> pd.DataFrame:
+    if file_path.lower().endswith(".csv"):
+        return pd.read_csv(file_path)
+    return pd.read_excel(file_path)
+
+
+def load_active_dataset(validate: bool = True) -> pd.DataFrame:
+    file_path = get_active_dataset_path()
+    if not os.path.exists(file_path):
+        raise FileNotFoundError(f"Dataset file not found: {file_path}")
+
+    mtime = os.path.getmtime(file_path)
+    df = _read_file_cached(file_path, mtime)
+
+    if validate:
+        is_valid, missing_cols = validate_dataset_schema(df)
+        if not is_valid:
+            raise ValueError(f"Dataset schema validation failed. Missing columns: {', '.join(missing_cols)}")
+
+    return df
+
+
+
 
 def _to_portable_path(path_str: str) -> str:
     """Convert path inside PROJECT_ROOT to a forward-slash relative path for cross-OS portability."""

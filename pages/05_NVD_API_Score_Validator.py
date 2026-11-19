@@ -14,12 +14,17 @@ P_DIR = os.path.dirname(S_DIR)
 if P_DIR not in sys.path:
     sys.path.insert(0, P_DIR)
 
-from app_utils.config_manager import (
-    get_active_dataset_path,
-    get_config_version,
-    get_nvd_api_key,
-    load_active_dataset,
-)
+try:
+    from app_utils.config_manager import (
+        get_active_dataset_path,
+        get_config_version,
+        get_nvd_api_key,
+        load_active_dataset,
+    )
+except Exception as e:
+    st.exception(e)
+    st.stop()
+
 
 
 NVD_API_KEY = get_nvd_api_key()
