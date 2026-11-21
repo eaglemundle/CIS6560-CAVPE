@@ -256,22 +256,6 @@ if os.path.exists(TAXONOMY_REGISTRY_PATH):
                     margin-bottom: 14px;
                     color: #212121;
                 ">
-                    <div style="
-                        display: inline-block;
-                        background-color: #B71C1C;
-                        color: #FFFFFF;
-                        font-size: 0.75rem;
-                        font-weight: 700;
-                        padding: 2px 8px;
-                        border-radius: 4px;
-                        letter-spacing: 0.05em;
-                        margin-bottom: 8px;
-                    ">
-                        SYSTEM DEAD ZONE · CRITICAL IMPACT
-                    </div>
-                    <div style="font-size: 0.92rem; font-weight: 600; color: #7F0000; margin-bottom: 8px;">
-                        {dead_zone_msg}
-                    </div>
                     <div style="font-size: 0.85rem; font-weight: 600; color: #424242;">
                         Detected Referencing Files:
                     </div>
