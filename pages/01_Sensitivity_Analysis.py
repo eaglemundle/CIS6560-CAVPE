@@ -248,7 +248,7 @@ with c_left:
         st.dataframe(
             styled_weights,
             hide_index=True,
-            use_container_width=True,
+            width='stretch',
             height=290,
             column_config={
                 "Factor": st.column_config.TextColumn("Factor", pinned=True)
@@ -291,7 +291,7 @@ with c_right:
             xaxis_title="",
             legend=dict(orientation="h", yanchor="bottom", y=1.04, xanchor="left", x=0, title=""),
         )
-        st.plotly_chart(fig_stab, use_container_width=True)
+        st.plotly_chart(fig_stab, width='stretch')
 
 
 # --- 3. Pairwise Version Comparison & Score Delta Distribution ---
@@ -350,7 +350,7 @@ with dist_col:
         )
         fig_dist.add_vline(x=0, line_dash="dash", line_color="#EF4444", annotation_text="0.000")
         fig_dist.update_layout(height=180, margin=dict(l=0, r=10, t=10, b=5), yaxis_title="Findings", bargap=0.08)
-        st.plotly_chart(fig_dist, use_container_width=True)
+        st.plotly_chart(fig_dist, width='stretch')
 
 # --- 4. Top-20 Vulnerability Score Delta Table ---
 h1, h2 = st.columns((70, 30), vertical_alignment="center")
@@ -378,4 +378,4 @@ st.dataframe(pd.DataFrame({
     "Reference Score": view["before_score"].map("{:.3f}".format),
     "Target Score": view["after_score"].map("{:.3f}".format),
     "Score Delta": view["delta"].map("{:+.3f}".format),
-}), hide_index=True, use_container_width=True)
+}), hide_index=True, width='stretch')

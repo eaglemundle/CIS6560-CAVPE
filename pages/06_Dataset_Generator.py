@@ -83,7 +83,7 @@ preview_df = pd.DataFrame([{
     "Low Assets": f"{l_rng[0]} ~ {l_rng[1]}",
     "Control Drop Rate": f"{drop_prob:.0%}",
 }])
-st.dataframe(preview_df, hide_index=True, use_container_width=True)
+st.dataframe(preview_df, hide_index=True, width='stretch')
 
 # 3. Generate & Save directly to reference_data
 if st.button("Generate Dataset", type="primary"):
@@ -153,11 +153,11 @@ if latest_file and os.path.exists(latest_file):
                     data=f,
                     file_name=os.path.basename(latest_file),
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    use_container_width=True
+                    width='stretch'
                 )
 
     latest_sheets = pd.read_excel(latest_file, sheet_name=None)
     preview_sheet = next((s for s, d in latest_sheets.items() if "Finding ID" in d.columns), list(latest_sheets.keys())[0])
-    st.dataframe(latest_sheets[preview_sheet].head(20), use_container_width=True)
+    st.dataframe(latest_sheets[preview_sheet].head(20), width='stretch')
 else:
     st.caption(f"No generated datasets found in `{os.path.abspath(REF_DIR)}` yet.")

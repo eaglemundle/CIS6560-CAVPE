@@ -34,3 +34,11 @@ pipeline_greenbone_nvd.py
 run_nvd.py
 scripts/sensitivity.py
 check_deps.py
+
+Add-Content -Path .gitignore -Value "`n# PyInstaller build artifacts`nbuild/`ndist/`n*.spec"
+
+
+# PyInstaller build artifacts
+build/
+dist/
+*.spec

@@ -371,7 +371,7 @@ fig.update_layout(
 
 st.plotly_chart(
     fig,
-    use_container_width=True,
+    width='stretch',
 )
 
 
@@ -395,7 +395,7 @@ with left:
     st.dataframe(
         matrix_summary,
         hide_index=True,
-        use_container_width=True,
+        width='stretch',
         height=178,  # Exact height for header + 4 rows (no empty trailing rows)
     )
 
@@ -416,7 +416,7 @@ with right:
 
     st.plotly_chart(
         fig2,
-        use_container_width=True,
+        width='stretch',
     )
 
 
@@ -462,7 +462,7 @@ strategic_columns = [
 st.dataframe(
     strategic[strategic_columns],
     hide_index=True,
-    use_container_width=True,
+    width='stretch',
     height=450,
 )
 
@@ -506,7 +506,7 @@ queue_columns = [
 st.dataframe(
     queue[queue_columns],
     hide_index=True,
-    use_container_width=True,
+    width='stretch',
     height=700,
 )
 

@@ -337,7 +337,7 @@ if active_df is not None and not active_df.empty:
         fig_hm.update_traces(
             hovertemplate="<b>%{y}</b> | %{x}<br>Critical Assets: <b>%{z}</b><extra></extra>"
         )
-        st.plotly_chart(fig_hm, use_container_width=True)
+        st.plotly_chart(fig_hm, width='stretch')
 
     with col_m1:
         st.markdown("**Evaluation Model 01**")
@@ -353,7 +353,7 @@ if active_df is not None and not active_df.empty:
                 "Asset Criticality  ›",
                 key="btn_go_asset_crit",
                 type="primary",
-                use_container_width=True
+                width='stretch'
             ):
                 st.switch_page(os.path.join(current_dir, "01_Asset_Criticality.py"))
 
@@ -370,7 +370,7 @@ if active_df is not None and not active_df.empty:
                 "Patch Difficulty  ›",
                 key="btn_go_patch_diff",
                 type="primary",
-                use_container_width=True
+                width='stretch'
             ):
                 st.switch_page(os.path.join(current_dir, "01_Patch_Difficulty.py"))
 
@@ -407,7 +407,7 @@ if active_df is not None and not active_df.empty:
                 "Analyze Trade-off  ›",
                 key="btn_go_tradeoff",
                 type="primary",
-                use_container_width=True
+                width='stretch'
             ):
                 st.switch_page(os.path.join(current_dir, "01_Remediation_Tradeoff.py"))
 
@@ -560,7 +560,7 @@ with col3:
                 color_discrete_map=color_map,
             )
             fig.update_traces(textinfo="value", textposition="inside")
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width='stretch')
             # Display active weight ratio beneath the chart for immediate context
             st.caption(f"**Applied Weights:** `{weight_summary}`")
         else:

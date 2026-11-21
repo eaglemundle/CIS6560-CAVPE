@@ -1,6 +1,7 @@
 import streamlit as st, pandas as pd, plotly.express as px, os, io, json
 from datetime import datetime
 from engines.scoring_validation import cvss_severity
+from app_utils.config_manager import load_active_dataset, get_active_dataset_path, get_config_version
 
 st.set_page_config(page_title="CVE-level analysis", layout="wide")
 st.title("CVE-Level Analysis, Baseline ranked list v0")
@@ -22,7 +23,16 @@ def load_data(path):
     )
     return df
 
-df = load_data("reference_data/vulnerability_contextualization_scanner_sample_updated.xlsx")
+from app_utils.config_manager import load_active_dataset
+
+try:
+    df = load_active_dataset(validate=True)
+    active_file = os.path.basename(get_active_dataset_path())
+    st.info(f"Active Dataset: **{active_file}** ({get_config_version()}) | Total Records: **{len(df):,}**")
+
+except Exception as e:
+    st.error(f"Failed to load active dataset: {e}")
+    st.stop()
 
 st.markdown("### Filter Workspace")
 f1, f2 = st.columns(2)
@@ -31,16 +41,23 @@ with f1:
     sel_sev = st.multiselect("Select CVSS Severity", options=sev_opt, default=sev_opt)
 with f2:
     ast_opt = sorted(df["Asset group"].unique()) if not df.empty else []
-    if "all_ast" not in st.session_state: st.session_state["all_ast"] = True
+    if "all_ast" not in st.session_state:
+        st.session_state["all_ast"] = True
+    for a in ast_opt:
+        if f"chk_{a}" not in st.session_state:
+            st.session_state[f"chk_{a}"] = st.session_state["all_ast"]
+
     def toggle():
-        for a in ast_opt: st.session_state[f"chk_{a}"] = st.session_state["all_ast"]
+        for a in ast_opt:
+            st.session_state[f"chk_{a}"] = st.session_state["all_ast"]
+
     s1, s2 = st.columns(2)
     with s1: 
         st.markdown("<div style='padding-top:25px;'></div>", unsafe_allow_html=True)
-        st.checkbox("Select All", value=st.session_state["all_ast"], key="all_ast", on_change=toggle)
-with s2:
-    with st.expander("Show Individual Asset Groups", expanded=False):
-        sel_ast = [a for a in ast_opt if st.checkbox(a, key=f"chk_{a}", value=st.session_state["all_ast"])]
+        st.checkbox("Select All", key="all_ast", on_change=toggle)
+    with s2:
+        with st.expander("Show Individual Asset Groups", expanded=False):
+            sel_ast = [a for a in ast_opt if st.checkbox(a, key=f"chk_{a}")]
 
 raw = df.copy()
 if sel_sev: raw = raw[raw["CVSS severity"].isin(sel_sev)]
@@ -49,6 +66,8 @@ raw = raw[raw["Asset group"].isin(sel_ast)] if sel_ast else raw[raw["Asset group
 dedup = raw.sort_values(by=["CVSS base score", "Total affected assets"], ascending=False).drop_duplicates(subset=["CVE ID"], keep="first")
 final = dedup.sort_values(by="CVE ID", ascending=False)
 removed = raw[~raw.index.isin(dedup.index)].sort_values(by="CVE ID", ascending=False)
+
+
 
 tot_cve, tot_raw, tot_rem = len(final), len(raw), len(removed)
 high_cnt = len(final[final["CVSS base score"] >= 7.0]) if tot_cve > 0 else 0

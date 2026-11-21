@@ -166,7 +166,7 @@ if st.session_state.get("df_coordinated_excel") is not None:
 
         st.dataframe(
             df_sorted,
-            use_container_width=True,
+            width='stretch',
             hide_index=True,
             height=450,
             column_config=display_config
@@ -189,7 +189,7 @@ if st.session_state.get("df_coordinated_excel") is not None:
                 y="Complexity Order (Jittered)",
                 color="Patch complexity" if "Patch complexity" in df_chart_copy.columns else None,
                 size="Bubble Size",
-                use_container_width=True
+                width='stretch'
             )
 
         st.markdown("---")
@@ -225,7 +225,7 @@ if st.session_state.get("df_coordinated_excel") is not None:
             
             st.dataframe(
                 styled_matrix,
-                use_container_width=True
+                width='stretch'
             )
 
         # st.markdown("---")
@@ -272,7 +272,7 @@ if st.session_state.get("df_coordinated_excel") is not None:
 
         st.dataframe(
             df_bottleneck_display,
-            use_container_width=True,
+            width='stretch',
             hide_index=True,
             column_config=bottleneck_config
         )

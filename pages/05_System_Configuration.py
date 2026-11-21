@@ -331,7 +331,7 @@ st.markdown("---")
 history = get_version_history()
 with st.expander("Configuration Version History", expanded=bool(history)):
     if history:
-        st.dataframe(pd.DataFrame(history), hide_index=True, use_container_width=True)
+        st.dataframe(pd.DataFrame(history), hide_index=True, width='stretch')
     else:
         st.caption("No version changes recorded yet (Baseline v1.0.0).")
 

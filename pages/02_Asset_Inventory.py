@@ -97,7 +97,7 @@ if st.session_state.get("df_coordinated_excel") is not None:
             data=df_asset_inv, 
             x="Asset Group Name", 
             y=["Total Assets", "Internet Facing Assets"], 
-            use_container_width=True
+            width='stretch'
         )
 
         st.subheader("Group Summary Matrix")
@@ -109,7 +109,7 @@ if st.session_state.get("df_coordinated_excel") is not None:
             inv_config = {col: st.column_config.NumberColumn(format="%.2f") for col in df_asset_inv.select_dtypes(include=["float"]).columns}
             for int_col in ["Total Vulnerabilities Found", "Total Assets", "Critical Assets", "High Criticality", "Medium Criticality", "Low Criticality", "Internet Facing Assets"]:
                 if int_col in df_asset_inv.columns: inv_config[int_col] = st.column_config.NumberColumn(format="%d")
-            st.dataframe(df_asset_inv, use_container_width=True, hide_index=True, height=250, column_config=inv_config)
+            st.dataframe(df_asset_inv, width='stretch', hide_index=True, height=250, column_config=inv_config)
     else: 
         st.error("Asset group column missing.")
 else: st.warning("Please instantiate master tracking data ledger streams to interact with inventory tools.")

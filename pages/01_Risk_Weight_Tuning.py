@@ -190,7 +190,7 @@ with cols[1]:
 with cols[2]:
     if is_valid_sum:
         st.success(f"Valid total: weights sum to {weights_sum:.2f}.")
-        if st.button("Save Weight Configurations", use_container_width=True):
+        if st.button("Save Weight Configurations", width='stretch'):
             is_default = all(
                 math.isclose(
                     updated_weights[key],
@@ -258,7 +258,7 @@ col_reset, col_download = st.columns(2)
 
 # 1. Reset configuration and version history back to Charter Default (v2.0.0)
 with col_reset:
-    if st.button("Reset to Charter Default (Clear History)", type="secondary", use_container_width=True):
+    if st.button("Reset to Charter Default (Clear History)", type="secondary", width='stretch'):
         now_str = datetime.datetime.now(LOCAL_TZ).strftime("%Y-%m-%d %H:%M:%S")
         client_ip = _get_client_ip()
         actor = f"{operator_name} (IP: {client_ip})" if operator_name else f"IP: {client_ip}"
@@ -294,7 +294,7 @@ with col_download:
         data=json.dumps(display_config, indent=2, ensure_ascii=False),
         file_name="weight_config.json",
         mime="application/json",
-        use_container_width=True,
+        width='stretch',
     )
 
 # 3. Rollback to a previously saved version from version_history

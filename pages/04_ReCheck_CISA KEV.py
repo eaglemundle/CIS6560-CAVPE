@@ -44,7 +44,7 @@ with config_container:
 st.markdown("")
 
 # 4. Action Button to Trigger New Scan
-if st.button("Run Coordinated Validation Pipeline (Append Today's Audit)", type="primary", use_container_width=True):
+if st.button("Run Coordinated Validation Pipeline (Append Today's Audit)", type="primary", width='stretch'):
     if not os.path.exists(CISA_KEV_JSON) or not os.path.exists(INPUT_EXCEL):
         st.error(f"Missing target database files inside `{REF_DATA_DIR}`.")
     else:
@@ -182,4 +182,4 @@ else:
             )
             ax.set_ylabel("")
             fig.patch.set_alpha(0.0)
-            st.pyplot(fig, use_container_width=False)
+            st.pyplot(fig, width='content')

@@ -361,7 +361,7 @@ else:
                 )
                 preview_df["Score"] = preview_df["Score"].map("{:.3f}".format)
 
-                st.dataframe(preview_df, hide_index=True, use_container_width=True)
+                st.dataframe(preview_df, hide_index=True, width='stretch')
 
 
 # SECTION 2: STRUCTURED VALIDATION

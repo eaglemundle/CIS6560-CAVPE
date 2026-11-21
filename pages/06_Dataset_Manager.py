@@ -71,13 +71,13 @@ if files:
                 ).strftime("%Y-%m-%d %H:%M:%S"),
             })
 
-        st.dataframe(pd.DataFrame(inventory), use_container_width=True, hide_index=True)
+        st.dataframe(pd.DataFrame(inventory), width='stretch', hide_index=True)
 
         selected_file = st.selectbox("Select Dataset to Manage", options=files)
         target_fp = os.path.join(REF_DATA_DIR, selected_file)
 
         c1, c2, c3 = st.columns([2, 2, 1.5])
-        if c1.button("Set as Active Dataset", type="primary", use_container_width=True):
+        if c1.button("Set as Active Dataset", type="primary", width='stretch'):
             ok, err = update_dataset_path(target_fp, validate=True, note="Activated from Dataset Manager")
             if ok:
                 st.success(f"Activated `{selected_file}` ({get_config_version()})")
@@ -86,10 +86,10 @@ if files:
                 st.error(f"Activation rejected: {err}")
 
         with open(target_fp, "rb") as raw_f:
-            c2.download_button("Download File", data=raw_f.read(), file_name=selected_file, use_container_width=True)
+            c2.download_button("Download File", data=raw_f.read(), file_name=selected_file, width='stretch')
 
         is_protected = selected_file in (sample_name, coord_name, active_name)
-        if c3.button("Delete File", disabled=is_protected, use_container_width=True):
+        if c3.button("Delete File", disabled=is_protected, width='stretch'):
             os.remove(target_fp)
             st.success(f"Deleted `{selected_file}`")
             st.rerun()
@@ -112,7 +112,7 @@ try:
             col: st.column_config.NumberColumn(format="%.2f")
             for col in df_active.select_dtypes(include=["float"]).columns
         }
-        st.dataframe(df_active, use_container_width=True, hide_index=True, height=350, column_config=active_num_config)
+        st.dataframe(df_active, width='stretch', hide_index=True, height=350, column_config=active_num_config)
 except Exception as e:
     st.error(f"Error reading active dataset: {e}")
 
@@ -149,7 +149,7 @@ if os.path.exists(COORDINATED_LEDGER_PATH):
 
             st.dataframe(
                 df_sorted,
-                use_container_width=True,
+                width='stretch',
                 hide_index=True,
                 height=450,
                 column_config=display_config,
@@ -182,7 +182,7 @@ if os.path.exists(EXCEL_FILE_PATH):
 
             st.dataframe(
                 df_sample,
-                use_container_width=True,
+                width='stretch',
                 hide_index=True,
                 height=350,
                 column_config=sample_num_config,

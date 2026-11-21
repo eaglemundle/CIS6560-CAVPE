@@ -215,7 +215,7 @@ if df_active is not None and not df_active.empty:
             if col_name in df_display.columns:
                 col_cfg[col_name] = st.column_config.NumberColumn(label, format=fmt, width="small")
 
-        st.dataframe(df_display, use_container_width=True, hide_index=True, height=400, column_config=col_cfg)
+        st.dataframe(df_display, width='stretch', hide_index=True, height=400, column_config=col_cfg)
 
         # --- 8. Scatter Chart ---
         st.markdown("---")
@@ -234,7 +234,7 @@ if df_active is not None and not df_active.empty:
             y="Exposure Weight (Jittered)",
             color="Validation Status",
             size="Bubble Size",
-            use_container_width=True
+            width='stretch'
         )
 
         # --- 9. Density Heatmap ---
@@ -261,7 +261,7 @@ if df_active is not None and not df_active.empty:
             columns=["Standard / Internal", "Internet-Facing Only", "Critical Only", "Critical + Internet-Facing"],
             fill_value=0
         )
-        st.dataframe(crit_matrix.style.background_gradient(cmap="Reds", axis=None), use_container_width=True)
+        st.dataframe(crit_matrix.style.background_gradient(cmap="Reds", axis=None), width='stretch')
 
         # --- 10. High-Criticality Triage Queue ---
         st.markdown("---")
@@ -289,4 +289,4 @@ if df_active is not None and not df_active.empty:
             "Asset Criticality", "Validated Risk Score", "Baseline Risk Score", "Risk Score Diff", "Validated CVSS", "Provided CVSS"
         ]
         df_q_display = df_crit_queue[[c for c in queue_cols if c in df_crit_queue.columns]].sort_values(by="Validated Risk Score", ascending=False)
-        st.dataframe(df_q_display, use_container_width=True, hide_index=True, column_config=col_cfg)
+        st.dataframe(df_q_display, width='stretch', hide_index=True, column_config=col_cfg)

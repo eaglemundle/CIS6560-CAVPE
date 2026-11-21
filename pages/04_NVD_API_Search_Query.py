@@ -68,7 +68,7 @@ with st.container(border=True):
         keyword = st.text_input("Search Keyword", placeholder="Example: CVE-1999-0524, Apache, OpenSSL")
     with slider_col:
         results_per_page = st.slider("Max Results to Fetch", min_value=5, max_value=100, value=30, step=5)
-    fetch_button = st.button("Fetch and Run Analysis Matrix", use_container_width=True, type="primary")
+    fetch_button = st.button("Fetch and Run Analysis Matrix", width='stretch', type="primary")
 
 if fetch_button:
     with st.spinner("Retrieving vulnerability data from the NVD API..."):
@@ -120,5 +120,5 @@ elif st.session_state.get("nvd_data"):
     if not df_manual.empty:
         df_manual_sorted = df_manual.sort_values(by="Calculated Risk Score", ascending=False).reset_index(drop=True)
         st.subheader("Risk Distribution Trend")
-        st.bar_chart(df_manual_sorted.head(10), x="CVE ID", y="Calculated Risk Score", use_container_width=True)
-        st.dataframe(df_manual_sorted, use_container_width=True, hide_index=True)
+        st.bar_chart(df_manual_sorted.head(10), x="CVE ID", y="Calculated Risk Score", width='stretch')
+        st.dataframe(df_manual_sorted, width='stretch', hide_index=True)

@@ -45,25 +45,25 @@ def render_home_page():
     with col1:
         st.subheader("Version 0.0")
         st.caption("for Streamlit testing")
-        if st.button("Run Version 0.0", key="go_v0", use_container_width=True):
+        if st.button("Run Version 0.0", key="go_v0", width='stretch'):
             st.switch_page("Legacy_Dashboard.py")
             
     with col2:
         st.subheader("Old Version 1.0")
         st.caption("Before Nov 2")
-        if st.button("Run Old V1.0", key="go_v1_old", use_container_width=True):
+        if st.button("Run Old V1.0", key="go_v1_old", width='stretch'):
             st.switch_page("pages/01_SOC_Main.py")
             
     with col3:
         st.subheader("Version 1.0")
         st.caption("Development")
-        if st.button("Run Dev V1.7", key="go_v1_dev", type="primary", use_container_width=True):
+        if st.button("Run Dev V1.7", key="go_v1_dev", type="primary", width='stretch'):
             st.switch_page("pages/00_v1_dashboard.py")
             
     with col4:
         st.subheader("Version 2.0")
         st.caption("Latest Development")
-        if st.button("Run Version 2.0", key="go_v2", type="primary", use_container_width=True):
+        if st.button("Run Version 2.0", key="go_v2", type="primary", width='stretch'):
             st.switch_page("pages/00_v2_Patch_Difficulty.py")
 
     st.markdown("<br>", unsafe_allow_html=True)
@@ -73,7 +73,7 @@ def render_home_page():
     
     doc_col1, doc_col2, doc_col3, doc_col4 = st.columns(4)
     with doc_col1:
-        if st.button("Open Project Calendar", key="go_calendar", use_container_width=True):
+        if st.button("Open Project Calendar", key="go_calendar", width='stretch'):
             st.switch_page("cavpe_calendar.py")
             
     with doc_col2:
@@ -85,7 +85,7 @@ def render_home_page():
                     data=file,
                     file_name=os.path.basename(doc_path),
                     mime="application/octet-stream",
-                    use_container_width=True,
+                    width='stretch',
                     key="download_charter",
                     help="Click to download the local Project Charter file."
                 )
@@ -104,25 +104,25 @@ def render_home_page():
     with col1:
         st.subheader("Version 0.0")
         st.caption("for Streamlit testing")
-        if st.button("Run Version 0.0", key="go_v0", use_container_width=True):
+        if st.button("Run Version 0.0", key="go_v0", width='stretch'):
             st.switch_page(os.path.join(BASE_DIR, "Legacy_Dashboard.py"))
             
     with col2:
         st.subheader("SOC Main (Latest)")
         st.caption("Primary Dashboard")
-        if st.button("Run SOC Main", key="go_v1_old", type="primary", use_container_width=True):
+        if st.button("Run SOC Main", key="go_v1_old", type="primary", width='stretch'):
             st.switch_page(os.path.join(BASE_DIR, "pages", SOC_MAIN_FILE))
             
     with col3:
         st.subheader("Version 1.0")
         st.caption("Development")
-        if st.button("Run Dev V1.7", key="go_v1_dev", use_container_width=True):
+        if st.button("Run Dev V1.7", key="go_v1_dev", width='stretch'):
             st.switch_page(os.path.join(BASE_DIR, "pages", "00_v1_dashboard.py"))
             
     with col4:
         st.subheader("Version 2.0")
         st.caption("Latest Development")
-        if st.button("Run Version 2.0", key="go_v2", use_container_width=True):
+        if st.button("Run Version 2.0", key="go_v2", width='stretch'):
             st.switch_page(os.path.join(BASE_DIR, "pages", "00_v2_Patch_Difficulty.py"))
 
     st.markdown("<br>", unsafe_allow_html=True)
@@ -132,7 +132,7 @@ def render_home_page():
     
     doc_col1, doc_col2, doc_col3, doc_col4 = st.columns(4)
     with doc_col1:
-        if st.button("Open Project Calendar", key="go_calendar", use_container_width=True):
+        if st.button("Open Project Calendar", key="go_calendar", width='stretch'):
             st.switch_page(os.path.join(BASE_DIR, "cavpe_calendar.py"))
             
     with doc_col2:
@@ -144,7 +144,7 @@ def render_home_page():
                     data=file,
                     file_name=os.path.basename(doc_path),
                     mime="application/octet-stream",
-                    use_container_width=True,
+                    width='stretch',
                     key="download_charter",
                     help="Click to download the local Project Charter file."
                 )
