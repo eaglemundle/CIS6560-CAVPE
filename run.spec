@@ -1,7 +1,20 @@
 # -*- mode: python ; coding: utf-8 -*-
 from PyInstaller.utils.hooks import collect_all
 
-datas = [('app.py', '.'), ('pages', 'pages'), ('app_utils', 'app_utils'), ('engines', 'engines'), ('.streamlit', '.streamlit'), ('static', 'static'), ('reference_data', 'reference_data'), ('scan_reports', 'scan_reports'), ('outputs', 'outputs')]
+datas = [
+    ('app.py', '.'),
+    ('pages', 'pages'),
+    ('app_utils', 'app_utils'),
+    ('engines', 'engines'),
+    ('asana', 'asana'),
+    ('.streamlit', '.streamlit'),
+    ('.env', '.'),
+    ('static', 'static'),
+    ('reference_data', 'reference_data'),
+    ('scan_reports', 'scan_reports'),
+    ('outputs', 'outputs'),
+]
+
 binaries = []
 hiddenimports = []
 tmp_ret = collect_all('streamlit')
