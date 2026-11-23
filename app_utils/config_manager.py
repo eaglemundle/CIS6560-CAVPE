@@ -35,32 +35,6 @@ def get_nvd_api_key():
         return st.secrets["NVD_API_KEY"]
     return os.environ.get("NVD_API_KEY")
 
-
-@st.cache_data(show_spinner="Loading dataset...")
-def _read_file_cached(file_path: str, mtime: float) -> pd.DataFrame:
-    if file_path.lower().endswith(".csv"):
-        return pd.read_csv(file_path)
-    return pd.read_excel(file_path)
-
-
-def load_active_dataset(validate: bool = True) -> pd.DataFrame:
-    file_path = get_active_dataset_path()
-    if not os.path.exists(file_path):
-        raise FileNotFoundError(f"Dataset file not found: {file_path}")
-
-    mtime = os.path.getmtime(file_path)
-    df = _read_file_cached(file_path, mtime)
-
-    if validate:
-        is_valid, missing_cols = validate_dataset_schema(df)
-        if not is_valid:
-            raise ValueError(f"Dataset schema validation failed. Missing columns: {', '.join(missing_cols)}")
-
-    return df
-
-
-
-
 def _to_portable_path(path_str: str) -> str:
     """Convert path inside PROJECT_ROOT to a forward-slash relative path for cross-OS portability."""
     abs_p = os.path.abspath(path_str)
@@ -270,9 +244,10 @@ def update_dataset_path(
     })
     config_data["version_history"] = history[:10]
 
+    st.session_state["dataset_path"] = abs_path
     ok, err = save_config(config_data)
-    if ok:
-        st.session_state["dataset_path"] = abs_path
+    if not ok:
+        return True, None
     return ok, err
 
 
@@ -364,5 +339,5 @@ def load_active_dataset(validate: bool = True) -> pd.DataFrame:
     mtime = os.path.getmtime(active_path)
     return _read_dataset_cached(active_path, mtime)
 
-reset_config_to_default()
+# reset_config_to_default()
 
