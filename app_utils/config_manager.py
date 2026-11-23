@@ -81,19 +81,21 @@ def save_config(data: dict) -> tuple[bool, str | None]:
 
 
 def _get_client_ip() -> str:
-    """Detect client public IP on Streamlit Cloud or fallback to local IP."""
+    """Return masked client IP on Streamlit Cloud, or 'Local Dev' locally."""
     try:
         headers = st.context.headers
         forwarded = headers.get("X-Forwarded-For") or headers.get("X-Real-Ip")
         if forwarded:
-            return forwarded.split(",")[0].strip()
+            raw_ip = forwarded.split(",")[0].strip()
+            parts = raw_ip.split(".")
+            if len(parts) == 4:
+                return f"{parts[0]}.{parts[1]}.***.***"
+            return "Cloud User"
     except Exception:
         pass
 
-    try:
-        return socket.gethostbyname(socket.gethostname())
-    except Exception:
-        return "Unknown IP"
+    return "Local Dev"
+
 
 
 def _increment_version(current_ver: str, bump_type: str = "patch") -> str:
