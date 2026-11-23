@@ -1,0 +1,37 @@
+name: Keep Streamlit App Alive
+
+on:
+  schedule:
+    - cron: '0 */6 * * *'
+  workflow_dispatch: 
+
+jobs:
+  wake-up:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.14.7'
+
+      - name: Install Playwright
+        run: |
+          pip install playwright
+          playwright install chromium
+
+      - name: Visit Streamlit App with Headless Browser
+        run: |
+          python -c "
+          from playwright.sync_api import sync_playwright
+          with sync_playwright() as p:
+              browser = p.chromium.launch(headless=True)
+              page = browser.new_page()
+              page.goto('YOUR_STREAMLIT_APP_URL', wait_until='networkidle', timeout=60000)
+              page.wait_for_timeout(10000) 
+
+              wake_btn = page.locator('button:has-text(\"get this app back up\")')
+              if wake_btn.count() > 0:
+                  wake_btn.click()
+                  page.wait_for_timeout(15000)
+              browser.close()
+          "
